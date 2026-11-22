@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
-import { MdCalendarMonth, MdChevronLeft, MdChevronRight, MdClose, MdExpandMore, MdInsights } from "react-icons/md";
+import { MdCalendarMonth, MdChevronLeft, MdChevronRight, MdClose, MdDeleteOutline, MdExpandMore, MdInsights } from "react-icons/md";
 import { monthLabel } from "@/lib/budget/months";
 import { pickerYear, pickerYears, type MonthState } from "@/lib/budget/picker";
+import { CLEAR_MONTH_DIALOG } from "./ClearMonth";
 import { focus, input } from "./ui";
 
 /** The words that go with each state, so a month is never told apart by colour alone. */
@@ -20,7 +21,7 @@ const STATE: Record<MonthState, { word: string; cell: string }> = {
  * not been started opens the "start this month" card. Arrow keys move between months, PageUp and PageDown
  * change the year, Escape closes.
  */
-export function MonthPicker({ spaceId, ym, now, months }: { spaceId: number; ym: string; now: string; months: { ym: string; items: number }[] }) {
+export function MonthPicker({ spaceId, ym, now, months, canClear = false }: { spaceId: number; ym: string; now: string; months: { ym: string; items: number }[]; canClear?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const grid = useRef<HTMLUListElement>(null);
   const [year, setYear] = useState(Number(ym.slice(0, 4)));
@@ -40,6 +41,11 @@ export function MonthPicker({ spaceId, ym, now, months }: { spaceId: number; ym:
     requestAnimationFrame(() => (grid.current?.querySelector<HTMLElement>("[aria-current='page']") ?? grid.current?.querySelector<HTMLElement>("a"))?.focus());
   };
   const close = () => dialog.current?.close();
+  // Hand over to the clear-month confirmation, which lives on the page, not in this dialog.
+  const clearMonth = () => {
+    close();
+    (document.getElementById(CLEAR_MONTH_DIALOG) as HTMLDialogElement | null)?.showModal();
+  };
 
   const onKeys = (e: React.KeyboardEvent) => {
     const links = [...(grid.current?.querySelectorAll<HTMLElement>("a") ?? [])];
@@ -81,7 +87,7 @@ export function MonthPicker({ spaceId, ym, now, months }: { spaceId: number; ym:
         ref={dialog}
         aria-labelledby="picker-title"
         onClick={(e) => e.target === dialog.current && close()}
-        className="glass isolate m-auto w-[min(25rem,calc(100vw-2rem))] rounded-2xl border border-line bg-surface p-0 text-ink shadow-card backdrop:bg-black/50"
+        className="glass isolate m-auto w-[min(32rem,calc(100vw-2rem))] rounded-2xl border border-line bg-surface p-0 text-ink shadow-card backdrop:bg-black/50"
       >
         <div onKeyDown={onKeys} className="flex max-h-[90vh] flex-col">
           <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
@@ -140,14 +146,22 @@ export function MonthPicker({ spaceId, ym, now, months }: { spaceId: number; ym:
             ))}
           </ul>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-line px-4 py-3">
             <Link href={`/s/${spaceId}/year/${year}`} onClick={close} className={`inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-sm font-medium text-accent hover:border-accent ${focus}`}>
               <MdInsights className="h-5 w-5" aria-hidden />
               See {year} as a year
             </Link>
-            <Link href={`/s/${spaceId}/${now}`} onClick={close} className={`inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-ink2 hover:bg-surface2 ${focus}`}>
-              This month
-            </Link>
+            <div className="flex items-center gap-1">
+              {canClear && (
+                <button type="button" onClick={clearMonth} className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-bad hover:bg-surface2 ${focus}`}>
+                  <MdDeleteOutline className="h-5 w-5" aria-hidden />
+                  Clear {monthLabel(ym).split(" ")[0]}
+                </button>
+              )}
+              <Link href={`/s/${spaceId}/${now}`} onClick={close} className={`inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-ink2 hover:bg-surface2 ${focus}`}>
+                This month
+              </Link>
+            </div>
           </div>
         </div>
       </dialog>

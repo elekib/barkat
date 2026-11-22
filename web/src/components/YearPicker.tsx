@@ -55,7 +55,7 @@ export function YearPicker({ spaceId, year, thisYear, years }: { spaceId: number
         ref={dialog}
         aria-labelledby="year-picker-title"
         onClick={(e) => e.target === dialog.current && close()}
-        className="glass isolate m-auto w-[min(25rem,calc(100vw-2rem))] rounded-2xl border border-line bg-surface p-0 text-ink shadow-card backdrop:bg-black/50"
+        className="glass isolate m-auto w-[min(32rem,calc(100vw-2rem))] rounded-2xl border border-line bg-surface p-0 text-ink shadow-card backdrop:bg-black/50"
       >
         <div onKeyDown={onKeys} className="flex max-h-[90vh] flex-col">
           <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">

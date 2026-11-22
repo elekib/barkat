@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import { MdDownload } from "react-icons/md";
 import { BackButton } from "@/components/BackButton";
+import { ClearFutureMonths } from "@/components/ClearFutureMonths";
 import { ImportForm } from "@/components/ImportForm";
 import { btnGhost, card } from "@/components/ui";
 import { currentYm, monthLabel } from "@/lib/budget/months";
 import { requireUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
-import { getSpace, listMonths } from "@/lib/store";
+import { futureMonths, getSpace, listMonths } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export default async function FilesPage({ params }: { params: Promise<{ spaceId:
   if (!space) notFound();
   const months = listMonths(db, spaceId);
   const now = currentYm();
+  const future = futureMonths(db, spaceId, now);
 
   return (
     <>
@@ -59,6 +61,21 @@ export default async function FilesPage({ params }: { params: Promise<{ spaceId:
               </a>
             ))}
           </div>
+        )}
+      </section>
+
+      <section className={`${card} mb-3 px-5 py-4`}>
+        <h2 className="text-base font-semibold">Clear future months</h2>
+        <p className="mb-3 mt-0.5 text-sm text-muted">
+          Months are started ahead of time by income schedules and by copying forward. If you want a clean slate after {monthLabel(now)}, delete those months here. {monthLabel(now)} and
+          earlier months are not touched.
+        </p>
+        {me.user.role !== "admin" ? (
+          <p className="text-sm text-muted">An administrator can clear months.</p>
+        ) : future.length === 0 ? (
+          <p className="text-sm text-muted">There are no months after {monthLabel(now)}.</p>
+        ) : (
+          <ClearFutureMonths spaceId={spaceId} current={now} months={future} />
         )}
       </section>
 

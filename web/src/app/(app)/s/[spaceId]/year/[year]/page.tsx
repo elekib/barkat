@@ -67,7 +67,7 @@ export default async function YearPage({ params }: { params: Promise<{ spaceId: 
           <YearPicker spaceId={spaceId} year={year} thisYear={Number(now.slice(0, 4))} years={choices} />
         </div>
         <nav aria-label="Year" className="flex flex-wrap items-end gap-1">
-          <Link href={`/s/${spaceId}/${monthNow}`} className="mr-2 inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink2 transition hover:bg-surface2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+          <Link href={`/s/${spaceId}/${monthNow}`} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink2 transition hover:bg-surface2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
             <MdEvent className="h-5 w-5" aria-hidden />
             {monthLabel(monthNow)}
           </Link>
