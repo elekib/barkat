@@ -33,6 +33,7 @@ import { trend } from "@/lib/budget/trend";
 import { BILL_STATUSES, INCOME_STATUSES } from "@/lib/budget/types";
 import { requireUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
+import { insightMonths, insightReport } from "@/lib/budget/insights";
 import { findMonthId, getSpace, listMonthRows, listMonthSizes, listSchedules, loadMonth, previousMonth } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -117,9 +118,6 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
           <MdInsights className="h-5 w-5" aria-hidden />
           {ym.slice(0, 4)}
           <span className="sr-only"> year view</span>
-        </Link>
-        <Link href={`/s/${spaceId}/insights`} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink2 transition hover:bg-surface2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
-          Insights
         </Link>
         <Link href={`/s/${spaceId}/${shiftYm(ym, -1)}`} aria-label="Previous month" className={navBtn}>
           <MdChevronLeft className="h-5 w-5" />
@@ -215,12 +213,22 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
     { bills: rows.bills, adHoc: rows.adHoc, incomes: rows.incomes },
   );
   const due = metrics.nextDue;
+  const report = insightReport(
+    insightMonths(
+      allMonths.map(({ ym: m, rows: r }) => ({ ym: m, bills: r.bills, adHoc: r.adHoc, incomes: r.incomes, banks: r.banks.map((b) => b.organic + b.made) })),
+      new Map(sizes.map((x) => [x.ym, x.items])),
+    ),
+    now,
+  );
+  // Only for the month the insights are about, so the banner never describes a different month than the one on screen.
+  const insightsBanner = report.latest === ym ? <InsightsBanner spaceId={spaceId} report={report} /> : null;
   const positive = summary.cushion > 0;
 
   return (
     <>
       {header}
       {canClear && <ClearMonth spaceId={spaceId} ym={ym} />}
+      {insightsBanner}
 
       {/* top row: cushion (75%) and what is due next (25%) */}
       <div className="mb-3 grid gap-3 lg:grid-cols-4">
@@ -782,5 +790,34 @@ function Total({ label, value }: { label: string; value: string }) {
       <span className="text-muted">{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function InsightsBanner({ spaceId, report }: { spaceId: number; report: ReturnType<typeof insightReport> }) {
+  const warns = report.insights.filter((i) => i.severity === "warn").length;
+  const n = report.insights.length;
+  const top = report.insights[0];
+  const next = report.forecast[0];
+  return (
+    <section
+      aria-label="Insights"
+      className={`${card} mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 bg-[radial-gradient(40rem_10rem_at_0%_0%,color-mix(in_srgb,var(--accent)_var(--glow),transparent),transparent)] px-5 py-3.5`}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <IconChip icon={n > 0 ? MdWarningAmber : MdInsights} />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">
+            {n === 0 ? "Insights: nothing unusual this month" : `Insights: ${n} ${n === 1 ? "thing" : "things"} worth a look${warns > 0 ? `, ${warns} to watch` : ""}`}
+          </p>
+          <p className="truncate text-sm text-muted">
+            {top ? top.title : next ? `Cushion expected around ${formatCompact(next.expected)} next month.` : "Bills and spending look like a usual month."}
+          </p>
+        </div>
+      </div>
+      <Link href={`/s/${spaceId}/insights`} className={`${btnGhost} gap-1.5 whitespace-nowrap`}>
+        See insights
+        <MdChevronRight className="h-4 w-4" aria-hidden />
+      </Link>
+    </section>
   );
 }
