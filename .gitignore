@@ -1,0 +1,24 @@
+# Secrets and runtime data (real bills, balances and names live here)
+data/
+.env
+
+# Real spreadsheets. Only made-up fixtures under web/__tests__/ may be committed.
+*.xlsx
+*.xls
+*.csv
+
+# Build output
+node_modules/
+.next/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# OS
+.DS_Store
+
+# Local tooling
+.claude/
+
+# Logo exploration sheets
+branding/drafts/

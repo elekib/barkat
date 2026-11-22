@@ -1,0 +1,10 @@
+# Build the image from this checkout instead of pulling it:
+#   docker compose -f compose.yaml -f compose.build.yaml up --build -d
+services:
+  barkat:
+    image: barkat:local
+    build:
+      context: ./web
+      args:
+        VERSION: ${BARKAT_VERSION:-dev}
+        GIT_SHA: ${BARKAT_GIT_SHA:-local}

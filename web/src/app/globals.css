@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- tokens ----------
+   Light is the default. Dark is selected for the dark surface (not an automatic
+   flip): it follows the system unless the viewer picked Light or Dark, which
+   sets data-theme on <html>. Chart colours are the validated categorical slots
+   (blue, orange) and status steps; text never wears a series colour. */
+:root {
+  color-scheme: light;
+  --page: #e3e8da;
+  --surface: #f1f3ea;
+  --surface-2: #e0e5d5;
+  --ink: #131c17;
+  --ink-2: #243b2f;
+  --muted: #3b4636;
+  --line: #ccd3bf;
+  --axis: #b0b9a2;
+  --ring: rgba(31, 42, 36, 0.1);
+  --shadow: 0 0.0625rem 0.125rem rgba(40, 60, 45, 0.08), 0 0.5rem 1.375rem rgba(40, 60, 45, 0.08);
+
+  --glow: 22%;
+  --sheen: linear-gradient(155deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.2) 28%, transparent 50%), linear-gradient(335deg, color-mix(in srgb, var(--fill) 8%, transparent), transparent 45%);
+  --rim: color-mix(in srgb, var(--accent) 24%, var(--line));
+  --accent: #3a5a40;
+  --accent-ink: #f8f8f2;
+  --good: #11691a;
+  --bad: #a52529;
+  /* Brighter twins for big numbers only (3:1 is enough at that size); small text keeps --good / --bad. */
+  --good-bright: #0a8f19;
+  /* Fill for progress meters: the accent as a vivid mark rather than as text or a button. */
+  --fill: #1f9d55;
+  --bad-bright: #c42830;
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+
+  --st-paid: #139428;
+  --st-made: #2468c4;
+  /* Text on the status fills, chosen per fill so it stays above 4.5:1. */
+  --on-paid: #0b0b0b;
+  --on-made: #ffffff;
+  --on-pending: #0b0b0b;
+  --st-pending: #fab219;
+  --st-none: #a9a79f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #aeaca3;
+    --line: #2c2c2a;
+    --axis: #383835;
+    --ring: rgba(255, 255, 255, 0.1);
+    --shadow: inset 0 0.0625rem 0 rgba(255, 255, 255, 0.05), 0 0.5rem 1.5rem rgba(0, 0, 0, 0.35);
+
+    --glow: 20%;
+    --sheen: linear-gradient(155deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.03) 32%, transparent 58%);
+    --rim: rgba(255, 255, 255, 0.13);
+    --accent: #5cc49a;
+    --accent-ink: #0d1f17;
+    --good: #3ec43e;
+    --bad: #ff8a80;
+    --good-bright: #3ec43e;
+    --fill: #5cc49a;
+    --bad-bright: #ff8a80;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+
+    --st-paid: #0ca30c;
+    --st-made: #3987e5;
+    --on-paid: #0b0b0b;
+    --on-made: #0b0b0b;
+    --on-pending: #0b0b0b;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #aeaca3;
+  --line: #2c2c2a;
+  --axis: #383835;
+  --ring: rgba(255, 255, 255, 0.1);
+  --shadow: inset 0 0.0625rem 0 rgba(255, 255, 255, 0.05), 0 0.5rem 1.5rem rgba(0, 0, 0, 0.35);
+
+  --glow: 20%;
+  --sheen: linear-gradient(155deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.03) 32%, transparent 58%);
+  --rim: rgba(255, 255, 255, 0.13);
+  --accent: #5cc49a;
+  --accent-ink: #0d1f17;
+  --good: #3ec43e;
+  --bad: #ff8a80;
+  --good-bright: #3ec43e;
+  --fill: #5cc49a;
+  --bad-bright: #ff8a80;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+
+  --st-paid: #0ca30c;
+    --st-made: #3987e5;
+  --on-paid: #0b0b0b;
+  --on-made: #0b0b0b;
+  --on-pending: #0b0b0b;
+}
+
+@layer base {
+  html { background: var(--page); }
+  body {
+    /* One flat colour, so anything that must match the page (the sticky month header) can use bg-page. */
+    background: var(--page);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible { outline: 0.125rem solid var(--accent); outline-offset: 0.125rem; }
+}
+
+/* Glass: a diagonal sheen over the card face, under its content. Light mode leaves it empty. */
+@layer components {
+  .glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--sheen);
+    pointer-events: none;
+  }
+  .glass { border-color: var(--rim); }
+}
+
+/* Respect the reduced-motion setting: no transitions or animated scrolling. */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Drop-downs: our own chevron with room on the right, instead of the browser's flush-right arrow. */
+/* Not in a layer: it has to win over the padding utilities on the same element. */
+.select-arrow {
+  appearance: none;
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%238a9184' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 8 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1rem;
+}
