@@ -19,7 +19,7 @@ import {
   bulkRows,
   bulkSchedules,
   type BulkOp,
-  applySchedules,
+  syncSchedules,
   scheduleSpace,
   updateSchedule,
   copyIntoMonth,
@@ -263,13 +263,17 @@ export async function saveAccountsAction(form: FormData): Promise<void> {
   const names = form.getAll("name");
   const kinds = form.getAll("kind");
   const balances = form.getAll("balance");
+  const shown = form.getAll("balanceShown");
   ids.forEach((raw, i) => {
     const id = Number(raw);
     if (!Number.isInteger(id) || rowSpace(db, "bank", id) !== ctx.spaceId || rowMonth(db, "bank", id) !== monthId) return;
     const name = text(80).min(1).safeParse(names[i]);
     const kind = text(40).safeParse(kinds[i] ?? "");
     if (name.success && kind.success) updateRow(db, "bank", id, { name: name.data, kind: kind.data });
-    const balance = typeof balances[i] === "string" ? money.safeParse(balances[i]) : null;
+    // Only a balance the user actually changed is an override. An untouched field holds what the dialog
+    // showed when it was opened, which may be out of date (a paycheck deleted since), and must not be pinned.
+    const untouched = typeof shown[i] === "string" && shown[i] === balances[i];
+    const balance = typeof balances[i] === "string" && !untouched ? money.safeParse(balances[i]) : null;
     if (balance?.success) overrideBalance(db, monthId, id, balance.data as number);
   });
 
@@ -327,7 +331,10 @@ export async function saveScheduleAction(form: FormData): Promise<void> {
   const db = getDb();
   if (scheduleSpace(db, id) !== ctx.spaceId) return;
   const values = parseSchedule(form);
-  if (values) updateSchedule(db, id, values);
+  if (values) {
+    updateSchedule(db, id, values);
+    syncSchedules(db, ctx.spaceId, ctx.ym);
+  }
   refresh(ctx.spaceId, ctx.ym);
 }
 
@@ -362,20 +369,10 @@ export async function bulkAction(form: FormData): Promise<void> {
   }
   if (!change) return;
 
-  if (target.data === "schedule") bulkSchedules(db, ctx.spaceId, ids, change);
-  else bulkRows(db, ctx.spaceId, target.data, ids, change);
-  refresh(ctx.spaceId, ctx.ym);
-}
-
-/** Fill this month's income from the schedules, skipping paydays already there. */
-export async function applySchedulesAction(form: FormData): Promise<void> {
-  if (!(await adminOrNull())) return;
-  const ctx = context(form);
-  if (!ctx) return;
-  const db = getDb();
-  const monthId = findMonthId(db, ctx.spaceId, ctx.ym);
-  if (monthId === undefined) return;
-  applySchedules(db, ctx.spaceId, monthId, ctx.ym);
+  if (target.data === "schedule") {
+    bulkSchedules(db, ctx.spaceId, ids, change);
+    syncSchedules(db, ctx.spaceId, ctx.ym);
+  } else bulkRows(db, ctx.spaceId, target.data, ids, change);
   refresh(ctx.spaceId, ctx.ym);
 }
 

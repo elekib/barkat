@@ -101,7 +101,9 @@ export function ManageAccounts({ spaceId, ym, monthName, accounts }: { spaceId: 
                   </label>
                   <label className="w-32 text-sm">
                     <span className="text-muted">Balance</span>
-                    <input name="balance" defaultValue={editableMoney(a.balance)} inputMode="decimal" className={`${input} mt-0.5 text-right tabular-nums`} />
+                    {/* What the dialog showed. The server only overrides when the typed figure differs from this, and the field is re-keyed when the balance changes (a deleted paycheck, a new Paid bill) so it never shows a stale figure. */}
+                    <input type="hidden" name="balanceShown" value={editableMoney(a.balance)} />
+                    <input key={a.balance} name="balance" defaultValue={editableMoney(a.balance)} inputMode="decimal" className={`${input} mt-0.5 text-right tabular-nums`} />
                   </label>
                   <button type="button" onClick={() => setRemoving(removing === a.id ? null : a.id)} aria-label={`Remove ${a.name}`} className={`grid h-9 w-9 place-items-center rounded-lg text-bad hover:bg-surface2 ${focus}`}>
                     <MdDeleteOutline className="h-5 w-5" aria-hidden />
