@@ -33,7 +33,7 @@ import { trend } from "@/lib/budget/trend";
 import { BILL_STATUSES, INCOME_STATUSES } from "@/lib/budget/types";
 import { requireUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
-import { insightMonths, insightReport } from "@/lib/budget/insights";
+import { insightMonths, insightReport, insightsLink } from "@/lib/budget/insights";
 import { findMonthId, getSpace, listMonthRows, listMonthSizes, listSchedules, loadMonth, previousMonth } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -221,7 +221,7 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
     now,
   );
   // Only for the month the insights are about, so the banner never describes a different month than the one on screen.
-  const insightsBanner = report.latest === ym ? <InsightsBanner spaceId={spaceId} report={report} /> : null;
+  const insightsBanner = report.latest === ym ? <InsightsBanner spaceId={spaceId} ym={ym} report={report} /> : null;
   const positive = summary.cushion > 0;
 
   return (
@@ -793,7 +793,7 @@ function Total({ label, value }: { label: string; value: string }) {
   );
 }
 
-function InsightsBanner({ spaceId, report }: { spaceId: number; report: ReturnType<typeof insightReport> }) {
+function InsightsBanner({ spaceId, ym, report }: { spaceId: number; ym: string; report: ReturnType<typeof insightReport> }) {
   const warns = report.insights.filter((i) => i.severity === "warn").length;
   const n = report.insights.length;
   const top = report.insights[0];
@@ -816,7 +816,7 @@ function InsightsBanner({ spaceId, report }: { spaceId: number; report: ReturnTy
           </p>
         </div>
       </div>
-      <Link href={`/s/${spaceId}/insights`} className={`${btn} gap-1.5 whitespace-nowrap`}>
+      <Link href={insightsLink(spaceId, { page: "month", ym })} className={`${btn} gap-1.5 whitespace-nowrap`}>
         See insights
         <MdChevronRight className="h-4 w-4" aria-hidden />
       </Link>

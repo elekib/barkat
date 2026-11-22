@@ -5,7 +5,7 @@ import { Collapsible } from "@/components/Collapsible";
 import { IconChip } from "@/components/IconChip";
 import { Tile } from "@/components/charts/Charts";
 import { card } from "@/components/ui";
-import { insightMonths, insightReport, MIN_FORECAST } from "@/lib/budget/insights";
+import { insightMonths, insightReport, insightsBack, MIN_FORECAST } from "@/lib/budget/insights";
 import { formatMoney } from "@/lib/budget/money";
 import { currentYm, monthLabel } from "@/lib/budget/months";
 import { requireUser } from "@/lib/auth/session";
@@ -14,7 +14,7 @@ import { getSpace, listMonthRows, listMonthSizes } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-export default async function InsightsPage({ params }: { params: Promise<{ spaceId: string }> }) {
+export default async function InsightsPage({ params, searchParams }: { params: Promise<{ spaceId: string }>; searchParams: Promise<{ from?: string; ym?: string; year?: string }> }) {
   await requireUser();
   const spaceId = Number((await params).spaceId);
   const db = getDb();
@@ -31,11 +31,11 @@ export default async function InsightsPage({ params }: { params: Promise<{ space
   const report = insightReport(months, now);
   const net = report.averageNet;
 
-  const back = report.latest ?? now;
+  const back = insightsBack(spaceId, await searchParams, report.latest ?? now);
 
   return (
     <>
-      <BackButton href={`/s/${spaceId}/${back}`}>Back to {monthLabel(back)}</BackButton>
+      <BackButton href={back.href}>{back.label}</BackButton>
       <div className="z-[15] md:sticky md:top-[var(--nav-h,3.5rem)] -mx-4 mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-line bg-page px-4 py-2.5">
         <div>
           <p className="text-sm font-medium text-muted">{space.name}</p>

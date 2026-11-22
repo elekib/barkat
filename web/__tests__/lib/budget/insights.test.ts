@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findInsights, forecast, overviewInsights, insightMonths, insightReport, type InsightMonth } from "@/lib/budget/insights";
+import { findInsights, forecast, overviewInsights, insightsBack, insightsLink, insightMonths, insightReport, type InsightMonth } from "@/lib/budget/insights";
 import type { MonthInput } from "@/lib/budget/trend";
 
 const c = (d: number) => d * 100;
@@ -84,5 +84,21 @@ describe("overviewInsights", () => {
   });
   it("is empty with no usable books", () => {
     expect(overviewInsights([])).toEqual({ books: 0, total: 0, warns: 0, top: [], net: null, next: null });
+  });
+});
+
+describe("insights back link", () => {
+  it("returns to the page the link came from", () => {
+    expect(insightsLink(3, { page: "overview" })).toBe("/s/3/insights?from=overview");
+    expect(insightsBack(3, { from: "overview" }, "2026-11")).toEqual({ href: "/", label: "Back to Overview" });
+    expect(insightsBack(3, { from: "month", ym: "2026-09" }, "2026-11")).toEqual({ href: "/s/3/2026-09", label: "Back to September 2026" });
+    expect(insightsBack(3, { from: "year", year: "2025" }, "2026-11")).toEqual({ href: "/s/3/year/2025", label: "Back to 2025" });
+  });
+  it("falls back to the latest month with no or a bad origin", () => {
+    const month = { href: "/s/3/2026-11", label: "Back to November 2026" };
+    expect(insightsBack(3, {}, "2026-11")).toEqual(month);
+    expect(insightsBack(3, { from: "month", ym: "nope" }, "2026-11")).toEqual(month);
+    expect(insightsBack(3, { from: "year", year: "20x5" }, "2026-11")).toEqual(month);
+    expect(insightsBack(3, { from: "elsewhere" }, "2026-11")).toEqual(month);
   });
 });

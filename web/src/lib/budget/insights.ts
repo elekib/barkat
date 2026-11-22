@@ -1,4 +1,4 @@
-import { shiftYm } from "./months";
+import { isYm, monthLabel, shiftYm } from "./months";
 import { isAdjustment, yearInputs } from "./year";
 import type { MonthInput } from "./trend";
 import type { Cents } from "./types";
@@ -242,4 +242,23 @@ export function overviewInsights(books: BookInsights[], limit = 4): OverviewInsi
       ? { ym, expected: same.reduce((a, f) => a + f.expected, 0), low: same.reduce((a, f) => a + f.low, 0), high: same.reduce((a, f) => a + f.high, 0) }
       : null,
   };
+}
+
+/** Where the Insights page was opened from, carried in the link so "back" returns there. */
+export function insightsLink(spaceId: number, from: { page: "overview" } | { page: "month"; ym: string } | { page: "year"; year: number }): string {
+  const base = `/s/${spaceId}/insights`;
+  if (from.page === "overview") return `${base}?from=overview`;
+  if (from.page === "month") return `${base}?from=month&ym=${from.ym}`;
+  return `${base}?from=year&year=${from.year}`;
+}
+
+/**
+ * The back button's target: the page the link came from (Overview, a month or a year), else the book's
+ * latest month. Anything in the query that does not parse is ignored, so a made-up link falls back.
+ */
+export function insightsBack(spaceId: number, query: { from?: string; ym?: string; year?: string }, fallbackYm: string): { href: string; label: string } {
+  if (query.from === "overview") return { href: "/", label: "Back to Overview" };
+  if (query.from === "month" && query.ym && isYm(query.ym)) return { href: `/s/${spaceId}/${query.ym}`, label: `Back to ${monthLabel(query.ym)}` };
+  if (query.from === "year" && query.year && /^\d{4}$/.test(query.year)) return { href: `/s/${spaceId}/year/${query.year}`, label: `Back to ${query.year}` };
+  return { href: `/s/${spaceId}/${fallbackYm}`, label: `Back to ${monthLabel(fallbackYm)}` };
 }

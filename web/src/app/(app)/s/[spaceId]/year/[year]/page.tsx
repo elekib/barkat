@@ -7,6 +7,7 @@ import { Tile } from "@/components/charts/Charts";
 import { YearChart } from "@/components/charts/YearChart";
 import { YearPicker } from "@/components/YearPicker";
 import { card } from "@/components/ui";
+import { insightsLink } from "@/lib/budget/insights";
 import { formatMoney } from "@/lib/budget/money";
 import { currentYm, monthLabel } from "@/lib/budget/months";
 import { isYear, yearInputs, yearView, yearsWithData, type YearMonth } from "@/lib/budget/year";
@@ -71,7 +72,7 @@ export default async function YearPage({ params }: { params: Promise<{ spaceId: 
             <MdEvent className="h-5 w-5" aria-hidden />
             {monthLabel(monthNow)}
           </Link>
-          <Link href={`/s/${spaceId}/insights`} className={`${navBtn} px-3 text-sm font-medium`}>
+          <Link href={insightsLink(spaceId, { page: "year", year })} className={`${navBtn} px-3 text-sm font-medium`}>
             Insights
           </Link>
           <Link href={`/s/${spaceId}/year/${year - 1}`} aria-label={`Previous year, ${year - 1}`} className={navBtn}>

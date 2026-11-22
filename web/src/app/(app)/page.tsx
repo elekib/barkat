@@ -20,7 +20,7 @@ import { DeleteBook } from "@/components/DeleteBook";
 import { ReorderBooks } from "@/components/ReorderBooks";
 import { IconChip } from "@/components/IconChip";
 import { card } from "@/components/ui";
-import { insightMonths, insightReport, overviewInsights, type OverviewInsights } from "@/lib/budget/insights";
+import { insightMonths, insightReport, insightsLink, overviewInsights, type OverviewInsights } from "@/lib/budget/insights";
 import { formatCompact, formatMoney } from "@/lib/budget/money";
 import { currentYm, monthLabel } from "@/lib/budget/months";
 import { dueStatus } from "@/lib/budget/metrics";
@@ -276,7 +276,7 @@ function InsightsBanner({ insights }: { insights: OverviewInsights }) {
       aria-label="Insights"
       className={`${card} insight-pop grid gap-x-8 gap-y-5 !border-accent/50 bg-[linear-gradient(110deg,color-mix(in_srgb,var(--accent)_30%,var(--surface)),color-mix(in_srgb,var(--fill)_22%,var(--surface))_55%,color-mix(in_srgb,var(--series-1)_16%,var(--surface)))] px-6 py-6 shadow-[0_0.75rem_2rem_color-mix(in_srgb,var(--accent)_28%,transparent)] lg:grid-cols-5`}
     >
-      <div className="flex flex-col gap-3 lg:col-span-2">
+      <div className="flex flex-col gap-4 lg:col-span-2">
         <div className="flex items-center gap-3">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-accent text-accent-ink shadow-card" aria-hidden>
             {total > 0 ? <MdWarningAmber className="h-7 w-7" /> : <MdInsights className="h-7 w-7" />}
@@ -289,7 +289,7 @@ function InsightsBanner({ insights }: { insights: OverviewInsights }) {
           </div>
         </div>
         {net !== null && (
-          <div className="pl-[3.75rem]">
+          <div className="rounded-xl border border-[color-mix(in_srgb,var(--accent)_28%,transparent)] bg-[color-mix(in_srgb,var(--surface)_55%,transparent)] px-4 py-3">
             <p className="text-sm text-ink2">Typical month, all books</p>
             <p className={`text-3xl font-bold tracking-tight ${net >= 0 ? "text-good-bright" : "text-bad-bright"}`}>
               {net >= 0 ? "+" : "-"}
@@ -315,7 +315,7 @@ function InsightsBanner({ insights }: { insights: OverviewInsights }) {
             {top.map((t, i) => (
               <li key={i}>
                 <Link
-                  href={`/s/${t.spaceId}/insights`}
+                  href={insightsLink(t.spaceId, { page: "overview" })}
                   className="-mx-2 flex items-start gap-3 rounded-lg px-2 py-2.5 transition hover:bg-surface/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   <MdNorthEast className={`mt-0.5 h-5 w-5 shrink-0 ${t.insight.severity === "warn" ? "text-bad" : "text-ink2"}`} aria-hidden />
