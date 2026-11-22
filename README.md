@@ -32,6 +32,21 @@ Each month you copy last month's sheet, then each week you update the expenses, 
 - **Separate books** for the household, for family members whose books you keep, and for your own.
 - **New month in one click**: last month's bills copied forward with amounts reset, and income filled from the schedules.
 
+## Screenshots
+
+All of these use the made-up demo data below, never real figures. The dark theme is the default look; the light theme and a phone-width screen follow.
+
+| | |
+| --- | --- |
+| ![The Overview: every book's cushion, what is in the bank, what is still to pay](docs/screenshots/overview-dark.png)<br>**Overview**: every book at a glance. | ![A month: cushion, paid so far, next due bill and charts](docs/screenshots/month-dark.png)<br>**A month**: the cushion up front, key numbers and charts. |
+| ![Accounts card and the bills sheet](docs/screenshots/accounts-dark.png)<br>**Accounts and bills**: balances that carry from month to month, and a sheet that saves as you type. | ![Manage accounts dialog](docs/screenshots/manage-accounts-dark.png)<br>**Manage accounts**: rename, retype, add or remove, saved together. |
+| ![Month picker: a calendar of years and months](docs/screenshots/month-picker-dark.png)<br>**Jump to any month**: started, empty or not started. | ![Year view: income and spending by month, with a table](docs/screenshots/year-dark.png)<br>**A whole year**: income, spending, saved and the cushion at each month's end. |
+| ![Import and export: backup, Excel export, multi-file import](docs/screenshots/import-export-dark.png)<br>**Import and export**: full backup, Excel in the original layout, many years at once. | ![The month in the light theme](docs/screenshots/month-light.png)<br>**Light theme**, or follow your system. |
+
+On a phone the same month screen stacks into one column, with the book tabs on top and Books, Users and Account along the bottom:
+
+<p align="center"><img src="docs/screenshots/month-phone-dark.png" alt="The month screen on a phone" width="320"></p>
+
 ## Try it with demo data
 
 Made-up books with history back to January 2018, for trying the month picker, the year view and imports without your own numbers:
