@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MdInsights, MdNorthEast, MdSouthEast, MdTrendingUp, MdWarningAmber } from "react-icons/md";
+import { BackButton } from "@/components/BackButton";
 import { Collapsible } from "@/components/Collapsible";
 import { IconChip } from "@/components/IconChip";
 import { Tile } from "@/components/charts/Charts";
@@ -31,16 +31,16 @@ export default async function InsightsPage({ params }: { params: Promise<{ space
   const report = insightReport(months, now);
   const net = report.averageNet;
 
+  const back = report.latest ?? now;
+
   return (
     <>
+      <BackButton href={`/s/${spaceId}/${back}`}>Back to {monthLabel(back)}</BackButton>
       <div className="z-[15] md:sticky md:top-[var(--nav-h,3.5rem)] -mx-4 mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-line bg-page px-4 py-2.5">
         <div>
           <p className="text-sm font-medium text-muted">{space.name}</p>
           <h1 className="text-xl font-semibold">Insights</h1>
         </div>
-        <Link href={`/s/${spaceId}/${report.latest ?? now}`} className="inline-flex h-9 items-center rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink2 transition hover:bg-surface2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
-          {monthLabel(report.latest ?? now)}
-        </Link>
       </div>
 
       {report.latest === null || report.basis < MIN_FORECAST ? (
