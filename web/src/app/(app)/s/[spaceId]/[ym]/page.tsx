@@ -801,20 +801,22 @@ function InsightsBanner({ spaceId, report }: { spaceId: number; report: ReturnTy
   return (
     <section
       aria-label="Insights"
-      className={`${card} mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 bg-[radial-gradient(40rem_10rem_at_0%_0%,color-mix(in_srgb,var(--accent)_var(--glow),transparent),transparent)] px-5 py-3.5`}
+      className={`${card} insight-pop mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 !border-accent/50 bg-[linear-gradient(110deg,color-mix(in_srgb,var(--accent)_30%,var(--surface)),color-mix(in_srgb,var(--fill)_22%,var(--surface))_55%,color-mix(in_srgb,var(--series-1)_16%,var(--surface)))] px-5 py-4 shadow-[0_0.75rem_2rem_color-mix(in_srgb,var(--accent)_28%,transparent)]`}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <IconChip icon={n > 0 ? MdWarningAmber : MdInsights} />
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-accent text-accent-ink shadow-card" aria-hidden>
+          {n > 0 ? <MdWarningAmber className="h-6 w-6" /> : <MdInsights className="h-6 w-6" />}
+        </span>
         <div className="min-w-0">
-          <p className="text-sm font-semibold">
+          <p className="text-base font-semibold">
             {n === 0 ? "Insights: nothing unusual this month" : `Insights: ${n} ${n === 1 ? "thing" : "things"} worth a look${warns > 0 ? `, ${warns} to watch` : ""}`}
           </p>
-          <p className="truncate text-sm text-muted">
+          <p className="truncate text-sm text-ink2">
             {top ? top.title : next ? `Cushion expected around ${formatCompact(next.expected)} next month.` : "Bills and spending look like a usual month."}
           </p>
         </div>
       </div>
-      <Link href={`/s/${spaceId}/insights`} className={`${btnGhost} gap-1.5 whitespace-nowrap`}>
+      <Link href={`/s/${spaceId}/insights`} className={`${btn} gap-1.5 whitespace-nowrap`}>
         See insights
         <MdChevronRight className="h-4 w-4" aria-hidden />
       </Link>
