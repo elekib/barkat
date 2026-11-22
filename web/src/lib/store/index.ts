@@ -423,6 +423,44 @@ export function listMonthSizes(db: Db, spaceId: number): { ym: string; items: nu
   ).map((r) => ({ ym: r.ym, items: r.items }));
 }
 
+/**
+ * The months after `afterYm` (newest first) with how many lines each holds. Used to show what "clear future
+ * months" would remove before anything is deleted.
+ */
+export function futureMonths(db: Db, spaceId: number, afterYm: string): { ym: string; items: number }[] {
+  return listMonthSizes(db, spaceId).filter((m) => m.ym > afterYm);
+}
+
+/**
+ * Delete one month with everything in it, but only if it is after `afterYm` (a future month): removing a month
+ * in the middle of the history would change the balances that carry into the months after it. Returns whether
+ * a month was deleted.
+ */
+export function clearMonth(db: Db, spaceId: number, ym: string, afterYm: string): boolean {
+  if (ym <= afterYm) return false;
+  return Number(db.prepare("DELETE FROM months WHERE space_id = ? AND ym = ?").run(spaceId, ym).changes) > 0;
+}
+
+/**
+ * Delete every month after `afterYm`, with its accounts, bills, one-offs and income. Earlier months are not
+ * touched: balances carry forward, so nothing before the cut can change. Income schedules stay, and start
+ * generating paydays again when a month is started later. Returns the months removed.
+ */
+export function clearFutureMonths(db: Db, spaceId: number, afterYm: string): string[] {
+  const doomed = futureMonths(db, spaceId, afterYm).map((m) => m.ym);
+  if (doomed.length === 0) return [];
+  db.exec("BEGIN");
+  try {
+    const del = db.prepare("DELETE FROM months WHERE space_id = ? AND ym = ?");
+    for (const ym of doomed) del.run(spaceId, ym);
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+  return doomed;
+}
+
 /* ---------- rows ---------- */
 
 export type RowKind = "bank" | "bill" | "income" | "adhoc";

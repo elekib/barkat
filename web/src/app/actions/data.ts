@@ -25,6 +25,8 @@ import {
   copyIntoMonth,
   createBlankMonth,
   createMonth,
+  clearFutureMonths,
+  clearMonth,
   createSpace,
   deleteSpace,
   findMonthId,
@@ -159,6 +161,24 @@ export async function deleteSpaceAction(form: FormData): Promise<void> {
   const space = getSpace(db, id);
   if (!space || form.get("confirm") !== space.name) return;
   deleteSpace(db, id);
+  revalidatePath("/", "layout");
+}
+
+/** Delete one future month. The cut is measured from today on the server, so a past month cannot be removed this way. */
+export async function clearMonthAction(form: FormData): Promise<void> {
+  if (!(await adminOrNull())) return;
+  const ctx = context(form);
+  if (!ctx) return;
+  clearMonth(getDb(), ctx.spaceId, ctx.ym, currentYm());
+  refresh(ctx.spaceId, ctx.ym);
+}
+
+/** Delete every month after the current one. Always measured from today on the server, never from the form. */
+export async function clearFutureMonthsAction(form: FormData): Promise<void> {
+  if (!(await adminOrNull())) return;
+  const spaceId = Number(form.get("spaceId"));
+  if (!Number.isInteger(spaceId) || !getSpace(getDb(), spaceId)) return;
+  clearFutureMonths(getDb(), spaceId, currentYm());
   revalidatePath("/", "layout");
 }
 

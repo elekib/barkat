@@ -14,6 +14,7 @@ import {
 import { BulkBar } from "@/components/BulkBar";
 import { Collapsible } from "@/components/Collapsible";
 import { IconChip } from "@/components/IconChip";
+import { ClearMonth } from "@/components/ClearMonth";
 import { CopyFromMonth } from "@/components/CopyFromMonth";
 import { ManageAccounts } from "@/components/ManageAccounts";
 import { MonthPicker } from "@/components/MonthPicker";
@@ -92,6 +93,9 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
       />
     ) : null;
 
+  // A month started ahead (by a schedule or copy-forward) can be cleared from the month picker.
+  const canClear = canEdit && ym > now && currentRows !== null;
+
   const dueBadge = currentRows ? dueStatus(currentRows.bills, ym === now ? new Date().getDate() : null) : null;
 
   const header = (
@@ -99,17 +103,17 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
       <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
         <div>
           <p className="text-sm font-medium text-muted">{space.name}</p>
-          <MonthPicker spaceId={spaceId} ym={ym} now={now} months={sizes} />
+          <MonthPicker spaceId={spaceId} ym={ym} now={now} months={sizes} canClear={canClear} />
         </div>
         {dueBadge && <DueBadge due={dueBadge} />}
       </div>
       <nav aria-label="Month" className="flex flex-wrap items-end gap-1">
         {copyControl}
-        <Link href={`/s/${spaceId}/files`} className="mr-2 inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink2 transition hover:bg-surface2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+        <Link href={`/s/${spaceId}/files`} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink2 transition hover:bg-surface2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
           <MdSwapVert className="h-5 w-5" aria-hidden />
           Import / export
         </Link>
-        <Link href={`/s/${spaceId}/year/${ym.slice(0, 4)}`} className="mr-2 inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink2 transition hover:bg-surface2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+        <Link href={`/s/${spaceId}/year/${ym.slice(0, 4)}`} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink2 transition hover:bg-surface2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
           <MdInsights className="h-5 w-5" aria-hidden />
           {ym.slice(0, 4)}
           <span className="sr-only"> year view</span>
@@ -213,6 +217,7 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
   return (
     <>
       {header}
+      {canClear && <ClearMonth spaceId={spaceId} ym={ym} />}
 
       {/* top row: cushion (75%) and what is due next (25%) */}
       <div className="mb-3 grid gap-3 lg:grid-cols-4">
