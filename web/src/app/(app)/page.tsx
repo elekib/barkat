@@ -3,6 +3,7 @@ import {
   MdAccountBalance,
   MdCheckCircle,
   MdChevronRight,
+  MdInsights,
   MdErrorOutline,
   MdEvent,
   MdInfoOutline,
@@ -19,14 +20,15 @@ import { DeleteBook } from "@/components/DeleteBook";
 import { ReorderBooks } from "@/components/ReorderBooks";
 import { IconChip } from "@/components/IconChip";
 import { card } from "@/components/ui";
-import { formatMoney } from "@/lib/budget/money";
+import { insightMonths, insightReport, insightsLink, overviewInsights, type OverviewInsights } from "@/lib/budget/insights";
+import { formatCompact, formatMoney } from "@/lib/budget/money";
 import { currentYm, monthLabel } from "@/lib/budget/months";
 import { dueStatus } from "@/lib/budget/metrics";
 import { suggestions, totals, type SpaceSnapshot, type SuggestionLevel } from "@/lib/budget/overview";
 import { summarize } from "@/lib/budget/summary";
 import { adminOrNull, requireUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
-import { findMonthId, listSpaces, loadMonth, spaceContents } from "@/lib/store";
+import { findMonthId, listMonthRows, listMonthSizes, listSpaces, loadMonth, spaceContents } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +85,19 @@ export default async function Home() {
   });
 
   const all = totals(snapshots);
+  const insights = overviewInsights(
+    listSpaces(db).map((sp) => ({
+      spaceId: sp.id,
+      name: sp.name,
+      report: insightReport(
+        insightMonths(
+          listMonthRows(db, sp.id).map(({ ym: m, rows: r }) => ({ ym: m, bills: r.bills, adHoc: r.adHoc, incomes: r.incomes, banks: r.banks.map((b) => b.organic + b.made) })),
+          new Map(listMonthSizes(db, sp.id).map((x) => [x.ym, x.items])),
+        ),
+        ym,
+      ),
+    })),
+  );
   const notes = suggestions(snapshots, monthLabel(ym));
   const username = me.user.username;
 
@@ -105,6 +120,8 @@ export default async function Home() {
         </div>
         {canEdit && <CreateSpace />}
       </header>
+
+      {insights.books > 0 && <InsightsBanner insights={insights} />}
 
       {all.started > 0 && (
         <section aria-label="All books" className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(13rem,1fr))]">
@@ -249,5 +266,75 @@ function DueChip({ s }: { s: SpaceSnapshot }) {
       {d.level === "overdue" ? <MdWarningAmber className="h-4 w-4 shrink-0" aria-hidden /> : <MdSchedule className="h-4 w-4 shrink-0" aria-hidden />}
       <span className="truncate">{text}</span>
     </span>
+  );
+}
+
+function InsightsBanner({ insights }: { insights: OverviewInsights }) {
+  const { total, warns, top, next, net, books } = insights;
+  return (
+    <section
+      aria-label="Insights"
+      className={`${card} insight-pop grid gap-x-8 gap-y-5 !border-accent/50 bg-[linear-gradient(110deg,color-mix(in_srgb,var(--accent)_30%,var(--surface)),color-mix(in_srgb,var(--fill)_22%,var(--surface))_55%,color-mix(in_srgb,var(--series-1)_16%,var(--surface)))] px-6 py-6 shadow-[0_0.75rem_2rem_color-mix(in_srgb,var(--accent)_28%,transparent)] lg:grid-cols-5`}
+    >
+      <div className="flex flex-col gap-4 lg:col-span-2">
+        <div className="flex items-center gap-3">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-accent text-accent-ink shadow-card" aria-hidden>
+            {total > 0 ? <MdWarningAmber className="h-7 w-7" /> : <MdInsights className="h-7 w-7" />}
+          </span>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-ink2">Insights</p>
+            <h2 className="text-xl font-bold leading-tight tracking-tight">
+              {total === 0 ? "Nothing unusual this month" : `${total} ${total === 1 ? "thing" : "things"} worth a look${warns > 0 ? `, ${warns} to watch` : ""}`}
+            </h2>
+          </div>
+        </div>
+        {net !== null && (
+          <div className="rounded-xl border border-[color-mix(in_srgb,var(--accent)_28%,transparent)] bg-[color-mix(in_srgb,var(--surface)_55%,transparent)] px-4 py-3">
+            <p className="text-sm text-ink2">Typical month, all books</p>
+            <p className={`text-3xl font-bold tracking-tight ${net >= 0 ? "text-good-bright" : "text-bad-bright"}`}>
+              {net >= 0 ? "+" : "-"}
+              {formatMoney(Math.abs(net))}
+              <span className="ml-1 text-base font-semibold text-ink2">a month</span>
+            </p>
+            <p className="text-[0.8125rem] text-ink2">
+              Income less spending, across {books} book{books === 1 ? "" : "s"}
+              {next ? ` · cushion likely ${formatCompact(next.low)} to ${formatCompact(next.high)} by ${monthLabel(next.ym).split(" ")[0]}` : ""}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="lg:col-span-3">
+        {top.length === 0 ? (
+          <p className="flex items-center gap-2 text-sm text-ink2">
+            <MdCheckCircle className="h-5 w-5 shrink-0 text-good" aria-hidden />
+            Bills and spending look like a usual month in every book.
+          </p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {top.map((t, i) => (
+              <li key={i}>
+                <Link
+                  href={insightsLink(t.spaceId, { page: "overview" })}
+                  className="-mx-2 flex items-start gap-3 rounded-lg px-2 py-2.5 transition hover:bg-surface/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                >
+                  <MdNorthEast className={`mt-0.5 h-5 w-5 shrink-0 ${t.insight.severity === "warn" ? "text-bad" : "text-ink2"}`} aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[0.6875rem] font-semibold uppercase tracking-wider text-ink2">
+                      <span className="sr-only">{t.insight.severity === "warn" ? "Warning: " : "Note: "}</span>
+                      {t.book}
+                    </span>
+                    <span className="block text-sm font-semibold">{t.insight.title}</span>
+                    <span className="block text-[0.8125rem] text-ink2">{t.insight.detail}</span>
+                  </span>
+                  <MdChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-ink2" aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-3 text-[0.8125rem] text-ink2">Open a book to see its full insights and forecast.</p>
+      </div>
+    </section>
   );
 }

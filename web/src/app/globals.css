@@ -158,3 +158,10 @@
   background-position: right 0.5rem center;
   background-size: 1rem;
 }
+
+/* The Insights banner rises into place once, so it reads as news rather than furniture. Reduced motion is handled above. */
+@keyframes insight-pop {
+  from { opacity: 0; transform: translateY(-0.5rem) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.insight-pop { animation: insight-pop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
