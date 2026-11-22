@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findInsights, forecast, insightMonths, insightReport, type InsightMonth } from "@/lib/budget/insights";
+import { findInsights, forecast, overviewInsights, insightMonths, insightReport, type InsightMonth } from "@/lib/budget/insights";
 import type { MonthInput } from "@/lib/budget/trend";
 
 const c = (d: number) => d * 100;
@@ -65,5 +65,23 @@ describe("insightMonths", () => {
     expect(out).toHaveLength(1);
     expect([...out[0].items.values()]).toEqual([{ name: "Rent", amount: c(600) }]);
     expect(out[0].spending).toBe(c(600));
+  });
+});
+
+describe("overviewInsights", () => {
+  const book = (spaceId: number, name: string, months: InsightMonth[]) => ({ spaceId, name, report: insightReport(months, "2026-12") });
+  it("rolls findings up with warnings first, and adds the next-month forecasts", () => {
+    const calm = book(1, "Home", steady(6));
+    const spiky = book(2, "Parents", [...steady(5), month("2026-06", { Rent: 1000, Power: 180, Net: 50 })]);
+    const o = overviewInsights([calm, spiky, book(3, "New", steady(2))]);
+    expect(o.books).toBe(2);
+    expect(o.total).toBe(1);
+    expect(o.warns).toBe(1);
+    expect(o.top[0]).toMatchObject({ spaceId: 2, book: "Parents" });
+    expect(o.next?.ym).toBe("2026-07");
+    expect(o.next?.expected).toBe(calm.report.forecast[0].expected + spiky.report.forecast[0].expected);
+  });
+  it("is empty with no usable books", () => {
+    expect(overviewInsights([])).toEqual({ books: 0, total: 0, warns: 0, top: [], next: null });
   });
 });

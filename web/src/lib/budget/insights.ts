@@ -202,3 +202,41 @@ export function insightReport(months: InsightMonth[], now: string): InsightRepor
     insights,
   };
 }
+
+export interface BookInsights {
+  spaceId: number;
+  name: string;
+  report: InsightReport;
+}
+
+export interface OverviewInsights {
+  /** Books with enough history to say anything. */
+  books: number;
+  /** Findings across those books, and how many of them are warnings. */
+  total: number;
+  warns: number;
+  /** The most urgent findings, warnings first, each with its book. */
+  top: { spaceId: number; book: string; insight: Insight }[];
+  /** Expected cushion of all those books together for the next month, when they have a forecast for it. */
+  next: { ym: string; expected: Cents; low: Cents; high: Cents } | null;
+}
+
+/** Roll the books' reports up for the Overview page. Books without enough history are left out. */
+export function overviewInsights(books: BookInsights[], limit = 4): OverviewInsights {
+  const live = books.filter((b) => b.report.latest !== null && b.report.basis >= MIN_FORECAST);
+  const all = live.flatMap((b) => b.report.insights.map((insight) => ({ spaceId: b.spaceId, book: b.name, insight })));
+  all.sort((a, b) => Number(b.insight.severity === "warn") - Number(a.insight.severity === "warn"));
+  const firsts = live.flatMap((b) => (b.report.forecast[0] ? [b.report.forecast[0]] : []));
+  // Only add forecasts that are for the same month, so the sum is of like with like.
+  const ym = firsts[0]?.ym;
+  const same = firsts.filter((f) => f.ym === ym);
+  return {
+    books: live.length,
+    total: all.length,
+    warns: all.filter((x) => x.insight.severity === "warn").length,
+    top: all.slice(0, limit),
+    next: ym
+      ? { ym, expected: same.reduce((a, f) => a + f.expected, 0), low: same.reduce((a, f) => a + f.low, 0), high: same.reduce((a, f) => a + f.high, 0) }
+      : null,
+  };
+}
