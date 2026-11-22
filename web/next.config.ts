@@ -23,7 +23,7 @@ const config: NextConfig = {
   poweredByHeader: false,
   // exceljs is Node-only and large; load it from node_modules instead of bundling it.
   serverExternalPackages: ["exceljs"],
-  experimental: { serverActions: { bodySizeLimit: "10mb" } },
+  experimental: { serverActions: { bodySizeLimit: "40mb" } },
   async headers() {
     return [
       {

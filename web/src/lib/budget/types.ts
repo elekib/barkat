@@ -25,6 +25,8 @@ export interface Bill extends Payable {
 }
 
 export interface Income {
+  /** What it is, when the caller has it ("Paycheck"). */
+  label?: string;
   amount: Cents;
   status: IncomeStatus;
   /** The account it goes into (a bank row id), if one is chosen. */

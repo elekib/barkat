@@ -8,3 +8,8 @@ useDefault = true
 [[allowlists]]
 description = "Fake secrets used as test fixtures"
 regexes = ['''fixture-[A-Za-z0-9-]+''']
+
+# The demo seed's public login (web/scripts/seed-demo.seed.ts). It only exists in the throwaway demo database.
+[[allowlists]]
+description = "Public demo login password"
+regexes = ['''Barkat-Sandbox-2026''']

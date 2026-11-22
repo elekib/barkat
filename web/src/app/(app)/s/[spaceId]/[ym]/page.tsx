@@ -1,4 +1,4 @@
-import { MdAccountBalance, MdAccountBalanceWallet, MdAdd, MdBarChart, MdBolt, MdDonutLarge, MdEventRepeat, MdLabel, MdMoveToInbox, MdPayments, MdReceiptLong, MdSavings, MdShowChart, MdTaskAlt, MdCheckCircle, MdEvent, MdEventAvailable, MdWarningAmber, MdSwapVert, MdChevronLeft, MdChevronRight, MdClose, MdNorthEast, MdSchedule, MdTrendingDown, MdTrendingUp } from "react-icons/md";
+import { MdAccountBalance, MdAccountBalanceWallet, MdAdd, MdBarChart, MdBolt, MdDonutLarge, MdEventRepeat, MdLabel, MdMoveToInbox, MdPayments, MdReceiptLong, MdSavings, MdShowChart, MdTaskAlt, MdCheckCircle, MdEvent, MdEventAvailable, MdWarningAmber, MdSwapVert, MdChevronLeft, MdChevronRight, MdClose, MdNorthEast, MdSchedule, MdInsights, MdTrendingDown, MdTrendingUp } from "react-icons/md";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -16,6 +16,7 @@ import { Collapsible } from "@/components/Collapsible";
 import { IconChip } from "@/components/IconChip";
 import { CopyFromMonth } from "@/components/CopyFromMonth";
 import { ManageAccounts } from "@/components/ManageAccounts";
+import { MonthPicker } from "@/components/MonthPicker";
 import { AutoForm } from "@/components/AutoForm";
 import { Meter, RankedBars, SegmentedBar, Tile } from "@/components/charts/Charts";
 import { TrendChart } from "@/components/charts/TrendChart";
@@ -31,7 +32,7 @@ import { trend } from "@/lib/budget/trend";
 import { BILL_STATUSES, INCOME_STATUSES } from "@/lib/budget/types";
 import { requireUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
-import { findMonthId, getSpace, listMonthRows, listSchedules, loadMonth, previousMonth } from "@/lib/store";
+import { findMonthId, getSpace, listMonthRows, listMonthSizes, listSchedules, loadMonth, previousMonth } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +69,10 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
   const monthId = findMonthId(db, spaceId, ym);
   const now = currentYm();
 
-  const sourceMonths = canEdit ? listMonthRows(db, spaceId).filter((m) => m.ym !== ym) : [];
+  // One pass over every month: the copy sources and the trend both come from it.
+  const allMonths = listMonthRows(db, spaceId);
+  const sizes = listMonthSizes(db, spaceId);
+  const sourceMonths = canEdit ? allMonths.filter((m) => m.ym !== ym) : [];
   const currentRows = monthId !== undefined ? loadMonth(db, monthId) : null;
   const copyControl =
     sourceMonths.length > 0 ? (
@@ -95,15 +99,20 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
       <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
         <div>
           <p className="text-sm font-medium text-muted">{space.name}</p>
-          <h1 className="text-2xl font-bold tracking-tight">{monthLabel(ym)}</h1>
+          <MonthPicker spaceId={spaceId} ym={ym} now={now} months={sizes} />
         </div>
         {dueBadge && <DueBadge due={dueBadge} />}
       </div>
-      <nav aria-label="Month" className="flex items-end gap-1">
+      <nav aria-label="Month" className="flex flex-wrap items-end gap-1">
         {copyControl}
         <Link href={`/s/${spaceId}/files`} className="mr-2 inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink2 transition hover:bg-surface2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
           <MdSwapVert className="h-5 w-5" aria-hidden />
           Import / export
+        </Link>
+        <Link href={`/s/${spaceId}/year/${ym.slice(0, 4)}`} className="mr-2 inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink2 transition hover:bg-surface2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+          <MdInsights className="h-5 w-5" aria-hidden />
+          {ym.slice(0, 4)}
+          <span className="sr-only"> year view</span>
         </Link>
         <Link href={`/s/${spaceId}/${shiftYm(ym, -1)}`} aria-label="Previous month" className={navBtn}>
           <MdChevronLeft className="h-5 w-5" />
@@ -177,7 +186,7 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
     todayDay: ym === now ? new Date().getDate() : null,
   });
   const points = trend(
-    listMonthRows(db, spaceId).map(({ ym: m, rows: r }) => ({
+    allMonths.map(({ ym: m, rows: r }) => ({
       ym: m,
       bills: r.bills,
       adHoc: r.adHoc,

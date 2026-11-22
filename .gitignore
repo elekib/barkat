@@ -1,5 +1,6 @@
 # Secrets and runtime data (real bills, balances and names live here)
 data/
+data-demo/
 .env
 
 # Real spreadsheets. Only made-up fixtures under web/__tests__/ may be committed.

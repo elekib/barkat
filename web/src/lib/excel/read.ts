@@ -8,8 +8,15 @@ export interface ImportedBank {
   name: string;
   kind: string;
   balance: Cents;
+  /** An admin override carried by a backup. Sheets have none. */
+  adjust?: Cents;
 }
-export interface ImportedBill {
+/** Which of the month's accounts a row belongs to: by name (sheets) or, from a backup, by position. */
+export interface AccountLink {
+  account: string;
+  accountAt?: number | null;
+}
+export interface ImportedBill extends AccountLink {
   name: string;
   status: BillStatus;
   projected: Cents;
@@ -18,28 +25,29 @@ export interface ImportedBill {
   notes: string;
   dueDay: number | null;
   scheduledDay: number | null;
-  /** Name of the account it is paid from; empty when the sheet has none. */
-  account: string;
 }
-export interface ImportedAdHoc {
+export interface ImportedAdHoc extends AccountLink {
   name: string;
   status: BillStatus;
   projected: Cents;
   tag: string;
   linkedTo: string;
   notes: string;
-  account: string;
 }
-export interface ImportedIncome {
+export interface ImportedIncome extends AccountLink {
   label: string;
   date: string;
   amount: Cents;
   status: IncomeStatus;
-  account: string;
 }
 export interface ImportedMonth {
   ym: string;
   sheet: string;
+  /**
+   * True for months from a Barkat backup: balances, overrides and links are stored as they were, so
+   * they are not nudged toward typed figures the way a sheet's bank balances are.
+   */
+  exact?: boolean;
   banks: ImportedBank[];
   bills: ImportedBill[];
   adHoc: ImportedAdHoc[];
@@ -51,7 +59,7 @@ export interface ReadResult {
 }
 
 /** Read every sheet of a workbook as one month. Sheets that are not months are reported, not guessed at. */
-export async function readWorkbook(data: ArrayBuffer | Uint8Array, defaultYear: number): Promise<ReadResult> {
+export async function readWorkbook(data: ArrayBuffer | Uint8Array, defaultYear: number | null): Promise<ReadResult> {
   const wb = new ExcelJS.Workbook();
   // exceljs types want a Node Buffer; the bytes are the same.
   await wb.xlsx.load(Buffer.from(data as Uint8Array) as unknown as ArrayBuffer);
@@ -63,7 +71,9 @@ export async function readWorkbook(data: ArrayBuffer | Uint8Array, defaultYear: 
   for (const ws of wb.worksheets) {
     const ym = parseMonthName(ws.name, defaultYear) ?? parseMonthName(text(ws.getCell(1, 1)), defaultYear);
     if (!ym) {
-      skipped.push({ sheet: ws.name, reason: "The name is not a month" });
+      // A month name with no year, in a file that has no year either, is worth saying so.
+      const noYear = defaultYear === null && (parseMonthName(ws.name, 2000) ?? parseMonthName(text(ws.getCell(1, 1)), 2000));
+      skipped.push({ sheet: ws.name, reason: noYear ? "The name has no year: set a year for this file" : "The name is not a month" });
       continue;
     }
     if (seen.has(ym)) {

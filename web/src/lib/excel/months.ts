@@ -5,9 +5,10 @@ const MONTHS = [
 
 /**
  * Month from a sheet name or title: "December", "Dec 2026", "December 2026",
- * "2026-12", "12/2026". A name with no year uses `defaultYear`. Null if it is not a month.
+ * "2026-12", "12/2026". A name with no year uses `defaultYear` (null when it has none, so the name
+ * does not count). Null if it is not a month.
  */
-export function parseMonthName(text: string, defaultYear: number): string | null {
+export function parseMonthName(text: string, defaultYear: number | null): string | null {
   const s = text.trim().toLowerCase();
   if (!s) return null;
 
@@ -23,7 +24,8 @@ export function parseMonthName(text: string, defaultYear: number): string | null
   const index = monthIndex(word);
   if (index < 0) return null;
   const year = /\b(\d{4})\b/.exec(s);
-  return ym(year ? Number(year[1]) : defaultYear, index + 1);
+  const y = year ? Number(year[1]) : defaultYear;
+  return y === null ? null : ym(y, index + 1);
 }
 
 function ym(y: number, m: number): string {
@@ -48,4 +50,20 @@ function distance(a: string, b: string): number {
     prev = cur;
   }
   return prev[b.length];
+}
+
+/* ---------- files ---------- */
+
+export type FileKind = "xlsx" | "backup";
+
+/** A four-digit year in a file name ("2022.xlsx", "budget-2019-final.xlsx"), or null. */
+export function yearFromName(name: string): number | null {
+  const m = /(?:^|\D)((?:19|20)\d{2})(?!\d)/.exec(name);
+  return m ? Number(m[1]) : null;
+}
+
+export function fileKind(name: string): FileKind | null {
+  if (/\.xlsx$/i.test(name)) return "xlsx";
+  if (/\.json$/i.test(name)) return "backup";
+  return null;
 }

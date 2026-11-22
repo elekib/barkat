@@ -35,3 +35,11 @@ export function trend(months: MonthInput[]): TrendPoint[] {
       ),
     }));
 }
+
+/** A round-number ceiling for a chart's y axis, so four ticks read 0 / 1K / 2K. */
+export function niceMax(cents: number): number {
+  const dollars = Math.max(cents / 100, 1);
+  const pow = 10 ** Math.floor(Math.log10(dollars));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => s * 4 >= dollars) ?? 10 * pow;
+  return step * 4 * 100;
+}
