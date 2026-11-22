@@ -276,7 +276,7 @@ function InsightsBanner({ insights }: { insights: OverviewInsights }) {
       aria-label="Insights"
       className={`${card} insight-pop grid gap-x-8 gap-y-5 !border-accent/50 bg-[linear-gradient(110deg,color-mix(in_srgb,var(--accent)_30%,var(--surface)),color-mix(in_srgb,var(--fill)_22%,var(--surface))_55%,color-mix(in_srgb,var(--series-1)_16%,var(--surface)))] px-6 py-6 shadow-[0_0.75rem_2rem_color-mix(in_srgb,var(--accent)_28%,transparent)] lg:grid-cols-5`}
     >
-      <div className="flex flex-col justify-between gap-4 lg:col-span-2">
+      <div className="flex flex-col gap-3 lg:col-span-2">
         <div className="flex items-center gap-3">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-accent text-accent-ink shadow-card" aria-hidden>
             {total > 0 ? <MdWarningAmber className="h-7 w-7" /> : <MdInsights className="h-7 w-7" />}
@@ -289,7 +289,7 @@ function InsightsBanner({ insights }: { insights: OverviewInsights }) {
           </div>
         </div>
         {net !== null && (
-          <div>
+          <div className="pl-[3.75rem]">
             <p className="text-sm text-ink2">Typical month, all books</p>
             <p className={`text-3xl font-bold tracking-tight ${net >= 0 ? "text-good-bright" : "text-bad-bright"}`}>
               {net >= 0 ? "+" : "-"}
