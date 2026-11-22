@@ -78,10 +78,11 @@ describe("overviewInsights", () => {
     expect(o.total).toBe(1);
     expect(o.warns).toBe(1);
     expect(o.top[0]).toMatchObject({ spaceId: 2, book: "Parents" });
+    expect(o.net).toBe(calm.report.averageNet! + spiky.report.averageNet!);
     expect(o.next?.ym).toBe("2026-07");
     expect(o.next?.expected).toBe(calm.report.forecast[0].expected + spiky.report.forecast[0].expected);
   });
   it("is empty with no usable books", () => {
-    expect(overviewInsights([])).toEqual({ books: 0, total: 0, warns: 0, top: [], next: null });
+    expect(overviewInsights([])).toEqual({ books: 0, total: 0, warns: 0, top: [], net: null, next: null });
   });
 });

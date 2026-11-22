@@ -270,7 +270,7 @@ function DueChip({ s }: { s: SpaceSnapshot }) {
 }
 
 function InsightsBanner({ insights }: { insights: OverviewInsights }) {
-  const { total, warns, top, next, books } = insights;
+  const { total, warns, top, next, net, books } = insights;
   return (
     <section
       aria-label="Insights"
@@ -288,12 +288,17 @@ function InsightsBanner({ insights }: { insights: OverviewInsights }) {
             </h2>
           </div>
         </div>
-        {next && (
+        {net !== null && (
           <div>
-            <p className="text-sm text-ink2">Expected cushion in {monthLabel(next.ym)}, all books</p>
-            <p className={`text-3xl font-bold tracking-tight ${next.expected >= 0 ? "text-good-bright" : "text-bad-bright"}`}>{formatMoney(next.expected)}</p>
+            <p className="text-sm text-ink2">Typical month, all books</p>
+            <p className={`text-3xl font-bold tracking-tight ${net >= 0 ? "text-good-bright" : "text-bad-bright"}`}>
+              {net >= 0 ? "+" : "-"}
+              {formatMoney(Math.abs(net))}
+              <span className="ml-1 text-base font-semibold text-ink2">a month</span>
+            </p>
             <p className="text-[0.8125rem] text-ink2">
-              Likely {formatCompact(next.low)} to {formatCompact(next.high)} · across {books} book{books === 1 ? "" : "s"}
+              Income less spending, across {books} book{books === 1 ? "" : "s"}
+              {next ? ` · cushion likely ${formatCompact(next.low)} to ${formatCompact(next.high)} by ${monthLabel(next.ym).split(" ")[0]}` : ""}
             </p>
           </div>
         )}

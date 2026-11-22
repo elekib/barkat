@@ -217,6 +217,8 @@ export interface OverviewInsights {
   warns: number;
   /** The most urgent findings, warnings first, each with its book. */
   top: { spaceId: number; book: string; insight: Insight }[];
+  /** Typical net of a month (income less spending) of all those books together. Null with none. */
+  net: Cents | null;
   /** Expected cushion of all those books together for the next month, when they have a forecast for it. */
   next: { ym: string; expected: Cents; low: Cents; high: Cents } | null;
 }
@@ -235,6 +237,7 @@ export function overviewInsights(books: BookInsights[], limit = 4): OverviewInsi
     total: all.length,
     warns: all.filter((x) => x.insight.severity === "warn").length,
     top: all.slice(0, limit),
+    net: live.length > 0 ? live.reduce((a, b) => a + (b.report.averageNet ?? 0), 0) : null,
     next: ym
       ? { ym, expected: same.reduce((a, f) => a + f.expected, 0), low: same.reduce((a, f) => a + f.low, 0), high: same.reduce((a, f) => a + f.high, 0) }
       : null,
