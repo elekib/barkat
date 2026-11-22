@@ -30,6 +30,18 @@ export default async function FilesPage({ params }: { params: Promise<{ spaceId:
       </div>
 
       <section className={`${card} mb-3 px-5 py-4`}>
+        <h2 className="text-base font-semibold">Full backup</h2>
+        <p className="mb-3 mt-0.5 text-sm text-muted">
+          Everything in this book in one file: every month, account, bill, one-off, income entry and income schedule, with balances exactly as they are.
+          Use it to move the book to another Barkat or to keep a copy. Restore it from Create book on the Books page. Users and settings are not included.
+        </p>
+        <a href={`/s/${spaceId}/backup`} className={btnGhost}>
+          <MdDownload className="mr-1.5 h-4 w-4" aria-hidden />
+          Download backup (.json)
+        </a>
+      </section>
+
+      <section className={`${card} mb-3 px-5 py-4`}>
         <h2 className="text-base font-semibold">Export to Excel</h2>
         <p className="mb-3 mt-0.5 text-sm text-muted">
           One sheet per month in the original sheet&apos;s layout, with its formulas, so the file still calculates in Excel.

@@ -1,13 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
-import { isYm } from "@/lib/budget/months";
+import { currentYm, isYm } from "@/lib/budget/months";
 import { parseMoney } from "@/lib/budget/money";
 import { readWorkbook } from "@/lib/excel/read";
 import { FREQUENCIES } from "@/lib/budget/schedules";
 import { BILL_STATUSES, INCOME_STATUSES } from "@/lib/budget/types";
 import { adminOrNull } from "@/lib/auth/session";
+import { parseBackup, restoreBook } from "@/lib/backup";
 import { getDb } from "@/lib/db";
 import {
   addRow,
@@ -402,4 +404,20 @@ export async function importAction(_prev: ImportState, form: FormData): Promise<
 
   revalidatePath(`/s/${spaceId}`, "layout");
   return { results };
+}
+
+/** Recreate a book from a Barkat backup file (.json) as a new book, then open it. */
+export async function restoreBookAction(_prev: { error?: string }, form: FormData): Promise<{ error?: string }> {
+  if (!(await adminOrNull())) return { error: "Only an admin can restore a book." };
+  const file = form.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose a backup file (.json)." };
+  if (file.size > MAX_IMPORT_BYTES * 5) return { error: "That file is over 50 MB." };
+  let id: number;
+  try {
+    id = restoreBook(getDb(), parseBackup(await file.text()));
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "That file could not be restored." };
+  }
+  revalidatePath("/", "layout");
+  redirect(`/s/${id}/${currentYm()}`);
 }

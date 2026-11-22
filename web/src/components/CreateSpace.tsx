@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { MdAdd, MdClose } from "react-icons/md";
 import { createSpaceAction } from "@/app/actions/data";
+import { RestoreBook } from "./RestoreBook";
 import { btn, btnGhost, focus, input } from "./ui";
 
 /** "Create book" button with the name form in a dialog. */
@@ -48,6 +49,11 @@ export function CreateSpace() {
             </button>
           </div>
         </form>
+        <div className="border-t border-line px-5 py-4">
+          <h3 className="text-sm font-semibold">Or restore a backup</h3>
+          <p className="mb-2 mt-0.5 text-sm text-muted">Recreate a book from a backup file made with Import and export, from this Barkat or another.</p>
+          <RestoreBook />
+        </div>
       </dialog>
     </>
   );

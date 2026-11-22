@@ -25,6 +25,7 @@ Each month you copy last month's sheet, then each week you update the expenses, 
 - **Income** with a `Pending` or `Received` status, plus **income schedules**: set a paycheck to repeat weekly, every two weeks or monthly and each month fills in its paydays (a biweekly check lands two or three times a month, as it does in real life).
 - **Bank balances** and a **cushion**: what is left once pending income arrives and every outstanding bill is paid, labelled *Saving* or *Debt*.
 - **A dashboard** for each month: the cushion up front, key numbers (paid so far, income received, next due bill, share saved), charts of spending by status, money in and out, largest payments and one-offs by tag, and a trend of income and spending across months.
+- **Full backup and restore**: download a whole book as one JSON file and recreate it as a new book in this or another Barkat, with balances exactly as they were.
 - **Excel import and export**: bring in a workbook with one sheet per month (the original layout), and export every month back out in that same layout, formulas included, so the file still calculates in Excel.
 - **Light and dark mode**, or follow your system. Your choice is remembered in the browser.
 - **Separate books** for the household, for family members whose books you keep, and for your own.
@@ -39,6 +40,7 @@ Each month you copy last month's sheet, then each week you update the expenses, 
 - [x] New month copy
 - [ ] Yearly repeat for one-offs such as zakat
 - [x] Excel import and export (one sheet per month)
+- [x] Full book backup and restore (JSON)
 - [x] Sign-in, roles (admin, viewer) and a navigation bar
 - [ ] Personal tracking in a "Me" book
 
