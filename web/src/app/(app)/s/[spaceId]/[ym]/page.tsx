@@ -372,7 +372,7 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
       {/* editable sheets: viewers see them but cannot change them */}
       <h2 className="mb-3 text-lg font-semibold tracking-tight">{canEdit ? "Edit this month" : "This month in detail"}</h2>
 
-      <Sheet id="bills" summary={`${rows.bills.length} · to pay ${formatMoney(summary.outstandingBills)}`} icon={MdReceiptLong} title="Bills" kind="bill" ctx={ctx} addLabel="Add bill" canEdit={canEdit}>
+      <Sheet id="bills" summary={`${rows.bills.length} · to pay ${formatMoney(summary.outstandingBills)}`} icon={MdReceiptLong} title="Bills" kind="bill" ctx={ctx} addLabel="Add bill" canEdit={canEdit} footer={<Total label="To pay" value={formatMoney(summary.outstandingBills)} />}>
         <Head grid={gridOf("bill", canEdit)} labels={["Bill", "Status", "Paid from", "Projected", "Start bal.", "End bal.", "To pay", "Due", "Sched.", "Interest", "Notes"]} align="lllrrrrccll" bulk={canEdit ? { formId: "bulk-bill", noun: "bills" } : undefined} />
         {rows.bills.map((b) => {
           const item = { name: b.name, status: b.status, projected: b.projected, startBalance: b.startBalance };
@@ -399,7 +399,6 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
             </Row>
           );
         })}
-        <Total label="To pay" value={formatMoney(summary.outstandingBills)} />
         {canEdit && <BulkBar formId="bulk-bill" rowKind="bill" spaceId={spaceId} ym={ym} noun={["bill", "bills"]} statuses={BILL_STATUSES} accounts={rows.banks.map((b) => ({ value: String(b.id), label: b.name || "Untitled account" }))} />}
       </Sheet>
 
@@ -413,6 +412,19 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
         addLabel="Add one-off"
         canEdit={canEdit}
         hint="Principal-only payments, zakat, trips. They come out of the same cushion."
+        footer={
+          <>
+            <Total label="To pay" value={formatMoney(summary.outstandingAdHoc)} />
+            {Object.keys(summary.adHocByTag).length > 0 && (
+              <p className="mt-1 text-sm text-muted">
+                By tag:{" "}
+                {Object.entries(summary.adHocByTag)
+                  .map(([tag, cents]) => `${tag} ${formatMoney(cents)}`)
+                  .join(" · ")}
+              </p>
+            )}
+          </>
+        }
       >
         <Head grid={gridOf("adhoc", canEdit)} labels={["Payment", "Status", "Paid from", "Amount", "Tag", "Linked to", "Notes"]} align="lllrlll" bulk={canEdit ? { formId: "bulk-adhoc", noun: "one-off payments" } : undefined} />
         {rows.adHoc.map((a) => (
@@ -426,16 +438,7 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
             <input name="notes" defaultValue={a.notes} placeholder="Notes" aria-label="Notes" className={cell} />
           </Row>
         ))}
-        <Total label="To pay" value={formatMoney(summary.outstandingAdHoc)} />
         {canEdit && <BulkBar formId="bulk-adhoc" rowKind="adhoc" spaceId={spaceId} ym={ym} noun={["one-off payment", "one-off payments"]} statuses={BILL_STATUSES} accounts={rows.banks.map((b) => ({ value: String(b.id), label: b.name || "Untitled account" }))} />}
-        {Object.keys(summary.adHocByTag).length > 0 && (
-          <p className="mt-1 text-sm text-muted">
-            By tag:{" "}
-            {Object.entries(summary.adHocByTag)
-              .map(([tag, cents]) => `${tag} ${formatMoney(cents)}`)
-              .join(" · ")}
-          </p>
-        )}
       </Sheet>
 
       <Collapsible
@@ -513,7 +516,7 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
         </div>
       </Collapsible>
 
-      <Sheet id="income" summary={`${rows.incomes.length} · to arrive ${formatMoney(summary.pendingIncome)}`} icon={MdPayments} title="Income" kind="income" ctx={ctx} addLabel="Add income" canEdit={canEdit}>
+      <Sheet id="income" summary={`${rows.incomes.length} · to arrive ${formatMoney(summary.pendingIncome)}`} icon={MdPayments} title="Income" kind="income" ctx={ctx} addLabel="Add income" canEdit={canEdit} footer={<Total label="Still to arrive" value={formatMoney(summary.pendingIncome)} />}>
         <Head grid={gridOf("income", canEdit)} labels={["What", "Date", "Amount", "Into", "Status"]} align="llrll" bulk={canEdit ? { formId: "bulk-income", noun: "income entries" } : undefined} />
         {rows.incomes.map((i) => (
           <Row key={`${i.id}-${i.bankId}-${i.label}-${i.date}-${i.amount}-${i.status}`} kind="income" id={i.id} ctx={ctx} canEdit={canEdit} label={i.label || i.date}>
@@ -524,7 +527,6 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
             <StatusSelect value={i.status} options={INCOME_STATUSES} />
           </Row>
         ))}
-        <Total label="Still to arrive" value={formatMoney(summary.pendingIncome)} />
         {canEdit && <BulkBar formId="bulk-income" rowKind="income" spaceId={spaceId} ym={ym} noun={["income entry", "income entries"]} statuses={INCOME_STATUSES} accounts={rows.banks.map((b) => ({ value: String(b.id), label: b.name || "Untitled account" }))} />}
       </Sheet>
     </>
@@ -642,6 +644,7 @@ function Sheet({
   hint,
   summary,
   canEdit,
+  footer,
   children,
 }: {
   id: string;
@@ -653,6 +656,8 @@ function Sheet({
   hint?: string;
   summary?: string;
   canEdit: boolean;
+  /** Totals under the table. Outside the scrolling area, so they stay put when the table scrolls sideways. */
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -678,6 +683,7 @@ function Sheet({
       }
     >
       <div className="-m-1 overflow-x-auto p-1">{children}</div>
+      {footer}
     </Collapsible>
   );
 }
