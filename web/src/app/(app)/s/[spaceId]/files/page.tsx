@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MdDownload } from "react-icons/md";
+import { BackButton } from "@/components/BackButton";
 import { ImportForm } from "@/components/ImportForm";
 import { btnGhost, card } from "@/components/ui";
 import { currentYm, monthLabel } from "@/lib/budget/months";
@@ -21,12 +21,10 @@ export default async function FilesPage({ params }: { params: Promise<{ spaceId:
 
   return (
     <>
+      <BackButton href={`/s/${spaceId}/${now}`}>Back to {monthLabel(now)}</BackButton>
       <div className="mb-4">
         <p className="text-sm font-medium text-muted">{space.name}</p>
         <h1 className="text-2xl font-bold tracking-tight">Import and export</h1>
-        <Link href={`/s/${spaceId}/${now}`} className="inline-block py-1 text-sm text-accent hover:underline">
-          Back to {monthLabel(now)}
-        </Link>
       </div>
 
       <section className={`${card} mb-3 px-5 py-4`}>

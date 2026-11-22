@@ -9,6 +9,7 @@ import { createUser, deleteUser, resetPassword, revokeUserSessions, updateUser }
 import { useToast } from "@/components/Toast";
 import { btn, btnDanger, btnQuiet, card, input } from "@/components/ui";
 import type { Role, User } from "@/lib/auth/accounts";
+import { BackButton } from "@/components/BackButton";
 
 export function UsersPage({ me, users }: { me: User; users: User[] }) {
   const notify = useToast();
@@ -50,7 +51,10 @@ export function UsersPage({ me, users }: { me: User; users: User[] }) {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+      <div>
+        <BackButton href="/">Back to Books</BackButton>
+        <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+      </div>
 
       <form onSubmit={create} className={`${card} space-y-3 p-5`}>
         <h2 className="text-base font-semibold">Add user</h2>

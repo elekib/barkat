@@ -8,6 +8,7 @@ import { changePassword, logoutEverywhere, revokeSession } from "@/app/actions/a
 import { useToast } from "@/components/Toast";
 import { btn, btnDanger, btnQuiet, card, input } from "@/components/ui";
 import type { User } from "@/lib/auth/accounts";
+import { BackButton } from "@/components/BackButton";
 
 export interface Session {
   id: string;
@@ -62,7 +63,10 @@ export function AccountPage({ user, sessions }: { user: User; sessions: Session[
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold tracking-tight">Account</h1>
+      <div>
+        <BackButton href="/">Back to Books</BackButton>
+        <h1 className="text-2xl font-bold tracking-tight">Account</h1>
+      </div>
 
       <div className={`${card} p-5`}>
         <div className="text-lg font-semibold">{user.username}</div>
