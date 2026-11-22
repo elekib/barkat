@@ -6,7 +6,6 @@ import type { IconType } from "react-icons";
 import {
   addRowAction,
   addScheduleAction,
-  applySchedulesAction,
   createMonthAction,
   saveRowAction,
   saveScheduleAction,
@@ -28,13 +27,13 @@ import { dueStatus, monthMetrics, type DueStatus } from "@/lib/budget/metrics";
 import { editableMoney, formatCompact, formatMoney } from "@/lib/budget/money";
 import { currentYm, dateInMonth, isYm, monthEnd, monthLabel, monthStart, shiftYm } from "@/lib/budget/months";
 import { summarize } from "@/lib/budget/summary";
-import { FREQUENCIES, FREQUENCY_LABEL, scheduleDates } from "@/lib/budget/schedules";
+import { FREQUENCIES, FREQUENCY_LABEL } from "@/lib/budget/schedules";
 import { trend } from "@/lib/budget/trend";
 import { BILL_STATUSES, INCOME_STATUSES } from "@/lib/budget/types";
 import { requireUser } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { insightMonths, insightReport, insightsLink } from "@/lib/budget/insights";
-import { findMonthId, getSpace, listMonthRows, listMonthSizes, listSchedules, loadMonth, previousMonth } from "@/lib/store";
+import { applySchedules, findMonthId, getSpace, listMonthRows, listMonthSizes, listSchedules, loadMonth, previousMonth } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +69,9 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
 
   const monthId = findMonthId(db, spaceId, ym);
   const now = currentYm();
+  // Paydays from the schedules fill in on their own for this month and later ones (never history).
+  // Rows already there, hand-entered or deleted on purpose, are matched and left alone.
+  if (canEdit && monthId !== undefined && ym >= now) applySchedules(db, spaceId, monthId, ym);
 
   // One pass over every month: the copy sources and the trend both come from it.
   const allMonths = listMonthRows(db, spaceId);
@@ -175,14 +177,6 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
   // Payment Made has already left the account, so it is no longer part of what is still to pay.
   const madeOf = (items: { status: string; projected: number }[]) => items.filter((i) => i.status === "Payment Made").reduce((a, i) => a + i.projected, 0);
   const schedules = listSchedules(db, spaceId);
-  const missingPaydays = schedules.reduce(
-    (n, sch) =>
-      n +
-      scheduleDates(sch.frequency, sch.anchor, ym).filter(
-        (d) => !rows.incomes.some((i) => i.date === d && i.scheduleId === sch.id),
-      ).length,
-    0,
-  );
 
   const metrics = monthMetrics({
     bills: rows.bills,
@@ -461,21 +455,12 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
         id="income-schedules"
         chip={<IconChip icon={MdEventRepeat} size="sm" />}
         title="Income schedules"
-        sub="Paydays repeat on their own. New months fill in from these."
+        sub="Paydays are added to the Income card on their own, with no duplicates. Use Add income for one-off pay."
         summary={`${schedules.length} schedule${schedules.length === 1 ? "" : "s"}`}
         className={`${card} mb-3`}
         actions={
           canEdit ? (
             <>
-              {schedules.length > 0 && (
-                <form action={applySchedulesAction}>
-                  <input type="hidden" name="spaceId" value={spaceId} />
-                  <input type="hidden" name="ym" value={ym} />
-                  <button type="submit" className={btnGhost} disabled={missingPaydays === 0}>
-                    {missingPaydays === 0 ? "This month is filled" : `Add ${missingPaydays} payday${missingPaydays === 1 ? "" : "s"} to ${monthLabel(ym)}`}
-                  </button>
-                </form>
-              )}
               <form action={addScheduleAction}>
                 <input type="hidden" name="spaceId" value={spaceId} />
                 <input type="hidden" name="ym" value={ym} />
@@ -526,7 +511,7 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
                   </fieldset>
                 </AutoForm>
               ))}
-              {canEdit && <BulkBar formId="bulk-schedule" rowKind="schedule" spaceId={spaceId} ym={ym} noun={["schedule", "schedules"]} accounts={rows.banks.map((b) => ({ value: b.name, label: b.name || "Untitled account" }))} deleteNote="Income already added to months stays." />}
+              {canEdit && <BulkBar formId="bulk-schedule" rowKind="schedule" spaceId={spaceId} ym={ym} noun={["schedule", "schedules"]} accounts={rows.banks.map((b) => ({ value: b.name, label: b.name || "Untitled account" }))} deleteNote="Paydays it added that are still Pending are removed. Received ones stay." />}
             </>
           )}
         </div>

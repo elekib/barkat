@@ -176,9 +176,10 @@ describe("income schedules", () => {
     expect(loadMonth(db, id).incomes.map((i) => i.label)).toEqual(["Bonus", "Pay"]);
   });
 
-  it("deleting a schedule keeps the income it already made", () => {
+  it("deleting a schedule keeps the income already received and drops the Pending rest", () => {
     const sid = addSchedule(db, space, { label: "Pay", amount: c(100), frequency: "monthly", anchor: "2026-11-05" });
     const id = createMonth(db, space, "2026-11");
+    db.prepare("UPDATE incomes SET status = 'Received' WHERE month_id = ?").run(id);
     deleteSchedule(db, sid);
     expect(listSchedules(db, space)).toEqual([]);
     expect(loadMonth(db, id).incomes).toHaveLength(1);

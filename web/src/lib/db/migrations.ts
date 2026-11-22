@@ -161,4 +161,13 @@ export const migrations: Migration[] = [
       ALTER TABLE banks ADD COLUMN adjust INTEGER NOT NULL DEFAULT 0;`,
     after: toLedger,
   },
+  {
+    version: 6,
+    sql: `-- A payday whose generated income row was deleted on purpose: the schedule does not add it back.
+      CREATE TABLE schedule_skips (
+        schedule_id INTEGER NOT NULL REFERENCES income_schedules(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        PRIMARY KEY (schedule_id, date)
+      );`,
+  },
 ];
