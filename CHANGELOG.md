@@ -41,3 +41,6 @@ Follows [Semantic Versioning](https://semver.org/). Before 1.0.0 a minor bump ma
 ### Changed
 - Months load faster with many years of them: the whole book's balances are carried once instead of once per month, and the month page reads them once for both the copy sources and the trend. The "Over time" chart labels about a dozen months however many there are.
 - The import action takes several files at once (up to 40, and up to 40 MB in all) and the preview/import button pair replaces the single Import button.
+
+### Fixed
+- The To pay and Still to arrive totals under the Bills, One-off payments and Income tables no longer move with the table when it is scrolled sideways. They now sit under the table at the edge of the card.
