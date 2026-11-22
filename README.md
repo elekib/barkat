@@ -26,10 +26,23 @@ Each month you copy last month's sheet, then each week you update the expenses, 
 - **Bank balances** and a **cushion**: what is left once pending income arrives and every outstanding bill is paid, labelled *Saving* or *Debt*.
 - **A dashboard** for each month: the cushion up front, key numbers (paid so far, income received, next due bill, share saved), charts of spending by status, money in and out, largest payments and one-offs by tag, and a trend of income and spending across months.
 - **Full backup and restore**: download a whole book as one JSON file and recreate it as a new book in this or another Barkat, with balances exactly as they were.
-- **Excel import and export**: bring in a workbook with one sheet per month (the original layout), and export every month back out in that same layout, formulas included, so the file still calculates in Excel.
+- **Excel import and export**: bring in a workbook with one sheet per month (the original layout), and export every month back out in that same layout, formulas included, so the file still calculates in Excel. Import takes many files at once (a workbook per year, or a Barkat backup), previews every month before writing, and keeps the months you already have exactly as they are when older years go in front of them.
+- **Jump to any month and see a whole year**: the month in the header opens a calendar of years and months (started, empty or not started), and the year view adds up income, spending, what you saved and the cushion at each month's end, with the average month and a chart.
 - **Light and dark mode**, or follow your system. Your choice is remembered in the browser.
 - **Separate books** for the household, for family members whose books you keep, and for your own.
 - **New month in one click**: last month's bills copied forward with amounts reset, and income filled from the schedules.
+
+## Try it with demo data
+
+Made-up books with history back to January 2018, for trying the month picker, the year view and imports without your own numbers:
+
+```bash
+cd web
+npm run seed:demo                              # writes web/data-demo/ (SEED_RESET=1 starts it over)
+BARKAT_DATA_DIR=data-demo npm run dev -- -p 3050
+```
+
+The seed also makes two fixed logins, so there is no setup screen and no password to change: `demo` (admin) and `viewer` (read-only), both with the password `Barkat-Sandbox-2026`. They are public on purpose and exist only in the demo database; never use them, or that database, anywhere other people can reach. The seed never touches `web/data`.
 
 ## Roadmap
 
@@ -40,6 +53,8 @@ Each month you copy last month's sheet, then each week you update the expenses, 
 - [x] New month copy
 - [ ] Yearly repeat for one-offs such as zakat
 - [x] Excel import and export (one sheet per month)
+- [x] Import many years at once, with a preview
+- [x] Month picker and year view
 - [x] Full book backup and restore (JSON)
 - [x] Sign-in, roles (admin, viewer) and a navigation bar
 - [ ] Personal tracking in a "Me" book

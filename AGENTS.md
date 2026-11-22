@@ -13,6 +13,7 @@ Guide for contributors and coding agents working on Barkat.
 - Barkat is a single Next.js app in `web/` (UI and API in one process).
 - Full stack from source: `make dev` (same as `docker compose -f compose.yaml -f compose.build.yaml up --build -d`). App on port 3040 (`BARKAT_PORT`). Logs: `docker logs -f barkat`.
 - Local checks in `web/`: `npm run typecheck`, `npm test`, `npm run build` (Node 22+).
+- Demo data for manual testing: `npm run seed:demo` in `web/` (made-up books from 2018, in `web/data-demo/`, git-ignored). Run the app on it with `BARKAT_DATA_DIR=data-demo` and sign in as `demo` (admin) or `viewer`; the password is in the README.
 - Tests live in `web/__tests__/`, mirroring `web/src/`. Import code under test with `@/` paths. Do not put tests next to source files.
 
 ## Architecture

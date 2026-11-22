@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { currentYm, isYm } from "@/lib/budget/months";
 import { parseMoney } from "@/lib/budget/money";
-import { readWorkbook } from "@/lib/excel/read";
+import { fileKind } from "@/lib/excel/months";
+import { planImport, readImportFile, type PlanRow, type ReadFile } from "@/lib/import";
 import { FREQUENCIES } from "@/lib/budget/schedules";
 import { BILL_STATUSES, INCOME_STATUSES } from "@/lib/budget/types";
 import { adminOrNull } from "@/lib/auth/session";
@@ -30,8 +31,10 @@ import {
   getSpace,
   moveSpace,
   bankInMonth,
-  importMonth,
+  importMonths,
+  listMonths,
   loadMonth,
+  type Bridge,
   rowMonth,
   rowSpace,
   updateRow,
@@ -358,52 +361,70 @@ export async function applySchedulesAction(form: FormData): Promise<void> {
 
 /* ---------- import ---------- */
 
+export interface ImportPreview {
+  rows: PlanRow[];
+  skipped: { file: string; sheet: string; reason: string }[];
+  /** Adjustment entries that keep the months already in the book as they were. */
+  bridges: Bridge[];
+  add: number;
+  replace: number;
+  skip: number;
+}
+
 export interface ImportState {
   error?: string;
-  results?: { sheet: string; ym?: string; outcome: string }[];
+  preview?: ImportPreview;
+  /** True once the months have been written (otherwise `preview` is what an import would do). */
+  done?: boolean;
 }
 
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+const MAX_IMPORT_FILES = 40;
 
-/** Import every month sheet of an uploaded .xlsx into a space. */
-export async function importAction(_prev: ImportState, form: FormData): Promise<ImportState> {
+/**
+ * Preview or run an import of one or more files: Excel workbooks (one year each, for sheets whose names
+ * have none) and Barkat backups. The form's `intent` is "preview" (nothing is written; the result is
+ * worked out and undone) or "import". Months go in oldest first, in one step, and months already in
+ * the book keep their balances (see importMonths in the store).
+ */
+export async function importAction(form: FormData): Promise<ImportState> {
   if (!(await adminOrNull())) return { error: "Only an admin can import." };
   const spaceId = Number(form.get("spaceId"));
   const db = getDb();
   if (!Number.isInteger(spaceId) || !getSpace(db, spaceId)) return { error: "Unknown space." };
-  const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) return { error: "Choose an .xlsx file." };
-  if (file.size > MAX_IMPORT_BYTES) return { error: "That file is over 10 MB." };
-  if (!/\.xlsx$/i.test(file.name)) return { error: "Only .xlsx files are supported." };
 
-  const year = Number(form.get("year"));
-  if (!Number.isInteger(year) || year < 1990 || year > 2200) return { error: "Enter a four-digit year." };
+  const files = form.getAll("file").filter((f): f is File => f instanceof File && f.size > 0);
+  const years = form.getAll("year");
+  if (files.length === 0) return { error: "Choose at least one file." };
+  if (files.length > MAX_IMPORT_FILES) return { error: `Import up to ${MAX_IMPORT_FILES} files at a time.` };
+
+  const read: ReadFile[] = [];
+  for (const [i, file] of files.entries()) {
+    const kind = fileKind(file.name);
+    if (!kind) return { error: `${file.name}: only .xlsx workbooks and .json backups are supported.` };
+    if (file.size > (kind === "backup" ? MAX_IMPORT_BYTES * 5 : MAX_IMPORT_BYTES)) return { error: `${file.name} is too large (over ${kind === "backup" ? 50 : 10} MB).` };
+    const raw = String(years[i] ?? "").trim();
+    const year = raw === "" ? null : Number(raw);
+    if (year !== null && (!Number.isInteger(year) || year < 1900 || year > 2200)) return { error: `${file.name}: enter a four-digit year.` };
+    try {
+      read.push(await readImportFile(file.name, new Uint8Array(await file.arrayBuffer()), year));
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : `${file.name} could not be read.` };
+    }
+  }
+
   const replace = form.get("replace") === "on";
   const defaultToFirstAccount = form.get("firstAccount") === "on";
+  const plan = planImport(read, listMonths(db, spaceId), replace);
+  const dry = form.get("intent") !== "import";
+  const report = importMonths(db, spaceId, plan.write, replace, { defaultToFirstAccount, dryRun: dry });
 
-  let read;
-  try {
-    read = await readWorkbook(new Uint8Array(await file.arrayBuffer()), year);
-  } catch {
-    return { error: "That file could not be read as an Excel workbook." };
-  }
-
-  const results: NonNullable<ImportState["results"]> = [];
-  for (const m of read.months) {
-    const outcome = importMonth(db, spaceId, m, replace, { defaultToFirstAccount });
-    results.push({
-      sheet: m.sheet,
-      ym: m.ym,
-      outcome:
-        outcome === "skipped"
-          ? "Skipped: month already exists"
-          : `${outcome === "replaced" ? "Replaced" : "Imported"}: ${m.bills.length} bills, ${m.adHoc.length} one-offs, ${m.incomes.length} income, ${m.banks.length} banks`,
-    });
-  }
-  for (const s of read.skipped) results.push({ sheet: s.sheet, outcome: `Skipped: ${s.reason}` });
-
-  revalidatePath(`/s/${spaceId}`, "layout");
-  return { results };
+  if (!dry) revalidatePath(`/s/${spaceId}`, "layout");
+  const count = (a: PlanRow["action"]) => plan.rows.filter((r) => r.action === a).length;
+  return {
+    done: !dry,
+    preview: { rows: plan.rows, skipped: plan.skipped, bridges: report.bridges, add: count("add"), replace: count("replace"), skip: count("skip") },
+  };
 }
 
 /** Recreate a book from a Barkat backup file (.json) as a new book, then open it. */

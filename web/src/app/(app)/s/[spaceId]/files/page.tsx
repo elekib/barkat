@@ -63,10 +63,16 @@ export default async function FilesPage({ params }: { params: Promise<{ spaceId:
       </section>
 
       <section className={`${card} px-5 py-4`}>
-        <h2 className="text-base font-semibold">Import from Excel</h2>
+        <h2 className="text-base font-semibold">Import months</h2>
         <p className="mb-3 mt-0.5 text-sm text-muted">
-          Each sheet is one month, named like &quot;December&quot;, &quot;December 2026&quot; or &quot;2026-12&quot;. It reads the Expenses table, the
-          Income list and the bank balances. Sheets that are not months are reported and skipped.
+          From Excel workbooks or Barkat backups, one file or many, so you can bring in older years: choose a workbook per year (2022.xlsx, 2023.xlsx) and give each its year.
+          Each sheet is one month, named like &quot;December&quot;, &quot;December 2026&quot; or &quot;2026-12&quot;; it reads the Expenses table, the Income list and the bank balances.
+          A backup (.json) restores its months as they were. Preview shows every month, what it holds and whether it is added, replaced or skipped before anything is written.
+          Sheets that are not months are reported and skipped.
+        </p>
+        <p className="mb-3 text-sm text-muted">
+          Months you already have keep their balances: an account&apos;s balance carries from month to month, so when older months go in front, an &quot;Adjustment&quot; entry in the
+          last older month makes the books meet, and nothing in your existing months is edited.
         </p>
         {me.user.role === "admin" ? (
           <ImportForm spaceId={spaceId} defaultYear={Number(now.slice(0, 4))} />

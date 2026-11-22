@@ -4,21 +4,13 @@ import { useId, useState } from "react";
 import { TableView } from "@/components/charts/Charts";
 import { formatCompact, formatMoney } from "@/lib/budget/money";
 import { monthLabel } from "@/lib/budget/months";
-import type { TrendPoint } from "@/lib/budget/trend";
+import { niceMax, type TrendPoint } from "@/lib/budget/trend";
 
 const W = 960;
 const H = 250;
 const M = { top: 16, right: 24, bottom: 32, left: 52 };
 const PW = W - M.left - M.right;
 const PH = H - M.top - M.bottom;
-
-/** A round-number ceiling for the y axis, so ticks read 0 / 1K / 2K. */
-function niceMax(cents: number): number {
-  const dollars = Math.max(cents / 100, 1);
-  const pow = 10 ** Math.floor(Math.log10(dollars));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => s * 4 >= dollars) ?? 10 * pow;
-  return step * 4 * 100;
-}
 
 const SERIES = [
   { key: "income", label: "Income", color: "var(--series-1)" },
@@ -41,6 +33,9 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
   const path = (key: "income" | "spending") => points.map((p, i) => `${i ? "L" : "M"}${x(i)},${y(p[key])}`).join(" ");
   const short = (ym: string) => monthLabel(ym).slice(0, 3);
   const last = points.length - 1;
+  // Many years of months: label about a dozen of them, always the first and the last.
+  const every = Math.ceil(points.length / 12);
+  const labelled = (i: number) => i === 0 || i === last || (i % every === 0 && last - i >= every / 2);
 
   const pick = (clientX: number, el: SVGSVGElement) => {
     const rect = el.getBoundingClientRect();
@@ -90,7 +85,7 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
             </g>
           ))}
 
-          {points.map((p, i) => (
+          {points.map((p, i) => labelled(i) && (
             <text key={p.ym} x={x(i)} y={H - 10} textAnchor="middle" className="fill-muted text-[0.6875rem]">
               {short(p.ym)}
               {p.ym.endsWith("-01") || i === 0 ? ` ’${p.ym.slice(2, 4)}` : ""}

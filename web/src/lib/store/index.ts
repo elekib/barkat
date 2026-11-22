@@ -1,10 +1,10 @@
 import type { Db } from "@/lib/db";
-import { monthStart } from "@/lib/budget/months";
+import { monthEnd, monthStart } from "@/lib/budget/months";
 import { addDays, endBalance } from "@/lib/budget/formulas";
 import type { BillStatus, Cents, IncomeStatus } from "@/lib/budget/types";
 import type { ImportedMonth } from "@/lib/excel/read";
 import { scheduleDates, type Frequency } from "@/lib/budget/schedules";
-import { carryBalances, type LedgerMonth } from "@/lib/budget/ledger";
+import { carryBalances, type LedgerLine, type LedgerMonth } from "@/lib/budget/ledger";
 
 /* ---------- row types ---------- */
 
@@ -181,12 +181,15 @@ export function createMonth(db: Db, spaceId: number, ym: string, fromYm?: string
 
   db.exec("BEGIN");
   try {
+    // A month started in front of every other one must not change them (see keepOpenings).
+    const before = startsBeforeAll(db, spaceId, ym) ? openingsOf(db, spaceId) : null;
     const res = db.prepare("INSERT INTO months (space_id, ym) VALUES (?, ?)").run(spaceId, ym);
     const monthId = Number(res.lastInsertRowid);
     // Copy from the month asked for (any other month in the space), else the newest earlier one.
     const prev = fromYm && fromYm !== ym && findMonthId(db, spaceId, fromYm) !== undefined ? fromYm : previousMonth(db, spaceId, ym);
     if (prev) copyForward(db, spaceId, findMonthId(db, spaceId, prev)!, monthId, ym);
     else applySchedules(db, spaceId, monthId, ym);
+    if (before) keepOpenings(db, spaceId, before, new Set([ym]));
     db.exec("COMMIT");
     return monthId;
   } catch (err) {
@@ -212,6 +215,7 @@ export function copyIntoMonth(
 ): { banks: number; bills: number } | undefined {
   const fromId = findMonthId(db, spaceId, fromYm);
   if (fromId === undefined || fromId === toId) return undefined;
+  const toYm = (db.prepare("SELECT ym FROM months WHERE id = ?").get(toId) as { ym: string }).ym;
   const all = loadMonth(db, fromId);
   const pickedBills = selection ? all.bills.filter((b) => selection.billIds.includes(b.id)) : all.bills;
   const needed = new Set(selection ? [...selection.bankIds, ...pickedBills.flatMap((b) => (b.bankId !== null ? [b.bankId] : []))] : all.banks.map((b) => b.id));
@@ -223,6 +227,7 @@ export function copyIntoMonth(
 
   db.exec("BEGIN");
   try {
+    const before = startsBeforeAll(db, spaceId, toYm) ? openingsOf(db, spaceId) : null;
     // Replace: this month's accounts and bills are swapped for the source's. One-offs and income stay,
     // and are pointed at the new account with the same name (or none).
     const keepLinks =
@@ -270,6 +275,7 @@ export function copyIntoMonth(
       relink("adhoc", keepLinks.adhoc);
       relink("incomes", keepLinks.incomes);
     }
+    if (before) keepOpenings(db, spaceId, before, new Set([toYm]));
     db.exec("COMMIT");
     return { banks, bills };
   } catch (err) {
@@ -328,6 +334,23 @@ export function ledgerMonth(rows: MonthRows): LedgerMonth {
   };
 }
 
+/** The same month with every admin override left out, for trends. */
+function plainLedger(rows: MonthRows): LedgerMonth {
+  const l = ledgerMonth(rows);
+  return { ...l, accounts: l.accounts.map((a) => ({ ...a, adjust: 0 })) };
+}
+
+/** A month's raw rows with the balances a ledger worked out for it (with and without overrides). */
+function withLedger(raw: MonthRows, mine: LedgerLine[], organic: LedgerLine[]): MonthRows {
+  return {
+    ...raw,
+    banks: raw.banks.map((b) => {
+      const l = mine.find((x) => x.id === b.id);
+      return l ? { ...b, balance: l.balance, opening: l.opening, carried: l.carried, made: l.made, organic: organic.find((x) => x.id === b.id)?.balance ?? l.balance } : b;
+    }),
+  };
+}
+
 /** A month with its account balances worked out from every month up to it. */
 export function loadMonth(db: Db, monthId: number): MonthRows {
   const info = db.prepare("SELECT space_id AS spaceId, ym FROM months WHERE id = ?").get(monthId) as { spaceId: number; ym: string } | undefined;
@@ -336,17 +359,8 @@ export function loadMonth(db: Db, monthId: number): MonthRows {
   const ids = db.prepare("SELECT id FROM months WHERE space_id = ? AND ym <= ? ORDER BY ym").all(info.spaceId, info.ym) as { id: number }[];
   const chain = ids.map((m) => (m.id === monthId ? raw : loadMonthRaw(db, m.id)));
   const ledger = carryBalances(chain.map(ledgerMonth));
-  // The same chain with every override left out, for trends.
-  const plain = carryBalances(chain.map((m) => ({ ...ledgerMonth(m), accounts: ledgerMonth(m).accounts.map((a) => ({ ...a, adjust: 0 })) })));
-  const mine = ledger[ledger.length - 1] ?? [];
-  const mineOrganic = plain[plain.length - 1] ?? [];
-  return {
-    ...raw,
-    banks: raw.banks.map((b) => {
-      const l = mine.find((x) => x.id === b.id);
-      return l ? { ...b, balance: l.balance, opening: l.opening, carried: l.carried, made: l.made, organic: mineOrganic.find((x) => x.id === b.id)?.balance ?? l.balance } : b;
-    }),
-  };
+  const plain = carryBalances(chain.map(plainLedger));
+  return withLedger(raw, ledger[ledger.length - 1] ?? [], plain[plain.length - 1] ?? []);
 }
 
 export function loadMonthRaw(db: Db, monthId: number): MonthRows {
@@ -380,13 +394,33 @@ export function loadMonthRaw(db: Db, monthId: number): MonthRows {
   };
 }
 
-/** Every month in a space, oldest first, with its rows. For trends across months. */
+/**
+ * Every month in a space, oldest first, with its rows. For trends across months. The balances are
+ * carried once down the whole chain, so many years of months cost one pass, not one per month.
+ */
 export function listMonthRows(db: Db, spaceId: number): { ym: string; rows: MonthRows }[] {
   const months = db.prepare("SELECT id, ym FROM months WHERE space_id = ? ORDER BY ym").all(spaceId) as {
     id: number;
     ym: string;
   }[];
-  return months.map((m) => ({ ym: m.ym, rows: loadMonth(db, m.id) }));
+  const raw = months.map((m) => loadMonthRaw(db, m.id));
+  const ledger = carryBalances(raw.map(ledgerMonth));
+  const plain = carryBalances(raw.map(plainLedger));
+  return months.map((m, i) => ({ ym: m.ym, rows: withLedger(raw[i], ledger[i], plain[i]) }));
+}
+
+/** Each month of a space, newest first, with how many rows (accounts, bills, one-offs, income) it holds. */
+export function listMonthSizes(db: Db, spaceId: number): { ym: string; items: number }[] {
+  return (
+    db
+      .prepare(
+        `SELECT m.ym AS ym,
+                (SELECT COUNT(*) FROM banks WHERE month_id = m.id) + (SELECT COUNT(*) FROM bills WHERE month_id = m.id)
+                + (SELECT COUNT(*) FROM adhoc WHERE month_id = m.id) + (SELECT COUNT(*) FROM incomes WHERE month_id = m.id) AS items
+         FROM months m WHERE m.space_id = ? ORDER BY m.ym DESC`,
+      )
+      .all(spaceId) as { ym: string; items: number }[]
+  ).map((r) => ({ ym: r.ym, items: r.items }));
 }
 
 /* ---------- rows ---------- */
@@ -620,10 +654,28 @@ export function applySchedules(db: Db, spaceId: number, monthId: number, ym: str
 
 export type ImportOutcome = "added" | "replaced" | "skipped";
 
-/**
- * Store one month read from a workbook. An existing month is left alone
- * unless `replace` is set, in which case it is deleted and rebuilt.
- */
+/** An Adjustment entry that keeps an existing month's balances as they were when months are added before it. */
+export interface Bridge {
+  /** The month that holds the entry: the one just before the month it protects. */
+  ym: string;
+  /** The month whose balances it protects. */
+  protects: string;
+  account: string;
+  /** Positive is added as income, negative as a one-off. Zero when only an override was needed. */
+  amount: Cents;
+  /**
+   * Also set as an override on that month's account (not an entry), when the months being added carry
+   * overrides of their own: the entry keeps the trend balances, the override keeps the shown ones.
+   */
+  override: Cents;
+}
+
+export interface ImportReport {
+  outcomes: { ym: string; outcome: ImportOutcome }[];
+  bridges: Bridge[];
+}
+
+/** Store one month read from a workbook or backup. See importMonths. */
 export function importMonth(
   db: Db,
   spaceId: number,
@@ -631,46 +683,176 @@ export function importMonth(
   replace: boolean,
   options: { defaultToFirstAccount?: boolean } = {},
 ): ImportOutcome {
-  const existing = findMonthId(db, spaceId, month.ym);
-  if (existing !== undefined && !replace) return "skipped";
+  return importMonths(db, spaceId, [month], replace, options).outcomes[0].outcome;
+}
+
+/** True when `ym` comes before every other month of the book. */
+function startsBeforeAll(db: Db, spaceId: number, ym: string): boolean {
+  const first = db.prepare("SELECT MIN(ym) AS ym FROM months WHERE space_id = ? AND ym != ?").get(spaceId, ym) as { ym: string | null };
+  return first.ym !== null && ym < first.ym;
+}
+
+const bankKey = (name: string) => name.trim().toLowerCase();
+
+/** Each account of a month named so it can be found again: its name, and its place among same-named ones. */
+function accountKeys(banks: { name: string }[]): string[] {
+  const seen = new Map<string, number>();
+  return banks.map((b) => {
+    const k = bankKey(b.name);
+    const n = seen.get(k) ?? 0;
+    seen.set(k, n + 1);
+    return `${k}#${n}`;
+  });
+}
+
+/** Where a month opens for an account: as shown, and without admin overrides (what trends use). */
+interface Opening {
+  shown: Cents;
+  plain: Cents;
+}
+
+/** Where every month of a book opens, by month and account. */
+function openingsOf(db: Db, spaceId: number): Map<string, Map<string, Opening>> {
+  const months = db.prepare("SELECT id, ym FROM months WHERE space_id = ? ORDER BY ym").all(spaceId) as { id: number; ym: string }[];
+  const raw = months.map((m) => loadMonthRaw(db, m.id));
+  const shown = carryBalances(raw.map(ledgerMonth));
+  const plain = carryBalances(raw.map(plainLedger));
+  return new Map(
+    months.map((m, i) => {
+      const keys = accountKeys(raw[i].banks);
+      return [m.ym, new Map(shown[i].map((l, j) => [keys[j], { shown: l.opening, plain: plain[i][j].opening }] as const))] as const;
+    }),
+  );
+}
+
+/**
+ * Months added to a book must not change the figures of the months that were already there. A month
+ * opens with what the one before it projected, so a month put in front of an existing one would
+ * change that one's balances. Each month that was there before, and now follows a new month,
+ * gets its old opening back like this:
+ *  - the account runs on from the new month: an "Adjustment" entry in that new month (income for a
+ *    rise, a one-off for a fall) makes its closing equal the opening the existing month had, both as
+ *    shown and as trends see it (without overrides; if the new months carry overrides of their own, a
+ *    matching override covers the difference);
+ *  - the account has no earlier month now: its typed opening is set to what it was.
+ * Nothing in an existing month is edited, so its entries and any admin override stay as they were.
+ */
+function keepOpenings(db: Db, spaceId: number, before: Map<string, Map<string, Opening>>, touched: Set<string>): Bridge[] {
+  const bridges: Bridge[] = [];
+  const months = () => db.prepare("SELECT id, ym FROM months WHERE space_id = ? ORDER BY ym").all(spaceId) as { id: number; ym: string }[];
+  // Fixing one month moves the figures after it, so look again from the next month on.
+  let from = 1;
+  for (let guard = 0; guard < 100000; guard++) {
+    const list = months();
+    const raw = list.map((m) => loadMonthRaw(db, m.id));
+    const shown = carryBalances(raw.map(ledgerMonth));
+    const plain = carryBalances(raw.map(plainLedger));
+    let fixed = false;
+    for (let i = Math.max(from, 1); i < list.length && !fixed; i++) {
+      const want = before.get(list[i].ym);
+      if (!want || touched.has(list[i].ym) || !touched.has(list[i - 1].ym)) continue;
+      const keys = accountKeys(raw[i].banks);
+      const prevKeys = accountKeys(raw[i - 1].banks);
+      for (let j = 0; j < shown[i].length; j++) {
+        const line = shown[i][j];
+        const target = want.get(keys[j]);
+        if (target === undefined || (target.shown === line.opening && target.plain === plain[i][j].opening)) continue;
+        if (!line.carried) {
+          db.prepare("UPDATE banks SET balance = balance + ? WHERE id = ?").run(target.shown - line.opening, line.id);
+          fixed = true;
+          continue;
+        }
+        const at = prevKeys.indexOf(keys[j]);
+        if (at < 0) continue;
+        const prev = raw[i - 1].banks[at];
+        const ym = list[i - 1].ym;
+        // The entry puts the trend balance right (overrides left out); an override covers what is left of the shown one.
+        const entry = target.plain - plain[i][j].opening;
+        const override = target.shown - line.opening - entry;
+        if (entry > 0) db.prepare("INSERT INTO incomes (month_id, label, date, amount, status, bank_id) VALUES (?, 'Adjustment', ?, ?, 'Received', ?)").run(list[i - 1].id, monthEnd(ym), entry, prev.id);
+        else if (entry < 0) db.prepare("INSERT INTO adhoc (month_id, name, status, projected, tag, bank_id) VALUES (?, 'Adjustment', 'Paid', ?, 'Adjustment', ?)").run(list[i - 1].id, -entry, prev.id);
+        if (override !== 0) db.prepare("UPDATE banks SET adjust = adjust + ? WHERE id = ?").run(override, prev.id);
+        bridges.push({ ym, protects: list[i].ym, account: raw[i].banks[j].name, amount: entry, override });
+        fixed = true;
+      }
+      if (fixed) from = i + 1;
+    }
+    if (!fixed) break;
+  }
+  return bridges;
+}
+
+/**
+ * Store months read from workbooks or backups, oldest first, in one step: all of them or none. An
+ * existing month is left alone unless `replace` is set, in which case it is deleted and rebuilt.
+ *
+ * Account balances carry from month to month, so months added before (or between) existing ones would
+ * change the balances of the months after them. They do not: see keepOpenings. Sheet months take
+ * their typed bank balances (reconcileMonth); backup months are stored as they were. With `dryRun`
+ * the whole thing is worked out and then undone, so a preview shows exactly what an import would do.
+ */
+export function importMonths(
+  db: Db,
+  spaceId: number,
+  months: ImportedMonth[],
+  replace: boolean,
+  options: { defaultToFirstAccount?: boolean; dryRun?: boolean } = {},
+): ImportReport {
+  const sorted = [...months].sort((a, b) => a.ym.localeCompare(b.ym));
+  const outcomes: ImportReport["outcomes"] = [];
+  const bridges: Bridge[] = [];
 
   db.exec("BEGIN");
   try {
-    if (existing !== undefined) db.prepare("DELETE FROM months WHERE id = ?").run(existing);
-    const monthId = Number(db.prepare("INSERT INTO months (space_id, ym) VALUES (?, ?)").run(spaceId, month.ym).lastInsertRowid);
-
-    const bank = db.prepare("INSERT INTO banks (month_id, name, kind, balance, sort) VALUES (?, ?, ?, ?, ?)");
-    const bankIds = month.banks.map((b, i) => Number(bank.run(monthId, b.name, b.kind, b.balance, i).lastInsertRowid));
-    // Accounts are matched by name (any case). A sheet with no account column can be given the first account.
-    const accountId = (name: string): number | null => {
-      const at = name ? month.banks.findIndex((b) => b.name.trim().toLowerCase() === name.trim().toLowerCase()) : -1;
-      if (at >= 0) return bankIds[at];
-      return !name && options.defaultToFirstAccount && bankIds.length > 0 ? bankIds[0] : null;
-    };
-
-    const bill = db.prepare(
-      `INSERT INTO bills (month_id, name, status, projected, start_balance, interest, notes, due_day, scheduled_day, sort, bank_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    month.bills.forEach((b, i) =>
-      bill.run(monthId, b.name, b.status, b.projected, b.startBalance, b.interest, b.notes, b.dueDay, b.scheduledDay, i, accountId(b.account)),
-    );
-
-    const adhoc = db.prepare(
-      "INSERT INTO adhoc (month_id, name, status, projected, tag, linked_to, notes, bank_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    );
-    for (const a of month.adHoc) adhoc.run(monthId, a.name, a.status, a.projected, a.tag, a.linkedTo, a.notes, accountId(a.account));
-
-    const income = db.prepare("INSERT INTO incomes (month_id, label, date, amount, status, bank_id) VALUES (?, ?, ?, ?, ?, ?)");
-    for (const i of month.incomes) income.run(monthId, i.label, i.date, i.amount, i.status, accountId(i.account));
-    reconcileMonth(db, monthId);
-
-    db.exec("COMMIT");
-    return existing !== undefined ? "replaced" : "added";
+    const before = openingsOf(db, spaceId);
+    const touched = new Set<string>();
+    for (const month of sorted) {
+      const existing = findMonthId(db, spaceId, month.ym);
+      if (existing !== undefined && !replace) {
+        outcomes.push({ ym: month.ym, outcome: "skipped" });
+        continue;
+      }
+      insertMonth(db, spaceId, month, existing, options);
+      touched.add(month.ym);
+      outcomes.push({ ym: month.ym, outcome: existing !== undefined ? "replaced" : "added" });
+    }
+    if (touched.size > 0) bridges.push(...keepOpenings(db, spaceId, before, touched));
+    db.exec(options.dryRun ? "ROLLBACK" : "COMMIT");
   } catch (err) {
     db.exec("ROLLBACK");
     throw err;
   }
+  return { outcomes, bridges };
+}
+
+function insertMonth(db: Db, spaceId: number, month: ImportedMonth, existing: number | undefined, options: { defaultToFirstAccount?: boolean }): void {
+  if (existing !== undefined) db.prepare("DELETE FROM months WHERE id = ?").run(existing);
+  const monthId = Number(db.prepare("INSERT INTO months (space_id, ym) VALUES (?, ?)").run(spaceId, month.ym).lastInsertRowid);
+
+  const bank = db.prepare("INSERT INTO banks (month_id, name, kind, balance, adjust, sort) VALUES (?, ?, ?, ?, ?, ?)");
+  const bankIds = month.banks.map((b, i) => Number(bank.run(monthId, b.name, b.kind, b.balance, b.adjust ?? 0, i).lastInsertRowid));
+  // Accounts are matched by name (any case), or by position for a backup. A sheet with no account
+  // column can be given the first account.
+  const accountId = (row: { account: string; accountAt?: number | null }): number | null => {
+    if (row.accountAt !== undefined) return row.accountAt === null ? null : (bankIds[row.accountAt] ?? null);
+    const name = row.account;
+    const at = name ? month.banks.findIndex((b) => bankKey(b.name) === bankKey(name)) : -1;
+    if (at >= 0) return bankIds[at];
+    return !name && options.defaultToFirstAccount && bankIds.length > 0 ? bankIds[0] : null;
+  };
+
+  const bill = db.prepare(
+    `INSERT INTO bills (month_id, name, status, projected, start_balance, interest, notes, due_day, scheduled_day, sort, bank_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  month.bills.forEach((b, i) => bill.run(monthId, b.name, b.status, b.projected, b.startBalance, b.interest, b.notes, b.dueDay, b.scheduledDay, i, accountId(b)));
+
+  const adhoc = db.prepare("INSERT INTO adhoc (month_id, name, status, projected, tag, linked_to, notes, bank_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+  for (const a of month.adHoc) adhoc.run(monthId, a.name, a.status, a.projected, a.tag, a.linkedTo, a.notes, accountId(a));
+
+  const income = db.prepare("INSERT INTO incomes (month_id, label, date, amount, status, bank_id) VALUES (?, ?, ?, ?, ?, ?)");
+  for (const i of month.incomes) income.run(monthId, i.label, i.date, i.amount, i.status, accountId(i));
+  if (!month.exact) reconcileMonth(db, monthId);
 }
 
 /* ---------- account links ---------- */
