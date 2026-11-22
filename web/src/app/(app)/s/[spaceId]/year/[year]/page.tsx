@@ -71,6 +71,9 @@ export default async function YearPage({ params }: { params: Promise<{ spaceId: 
             <MdEvent className="h-5 w-5" aria-hidden />
             {monthLabel(monthNow)}
           </Link>
+          <Link href={`/s/${spaceId}/insights`} className={`${navBtn} px-3 text-sm font-medium`}>
+            Insights
+          </Link>
           <Link href={`/s/${spaceId}/year/${year - 1}`} aria-label={`Previous year, ${year - 1}`} className={navBtn}>
             <MdChevronLeft className="h-5 w-5" />
           </Link>

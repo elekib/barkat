@@ -118,6 +118,9 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
           {ym.slice(0, 4)}
           <span className="sr-only"> year view</span>
         </Link>
+        <Link href={`/s/${spaceId}/insights`} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink2 transition hover:bg-surface2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+          Insights
+        </Link>
         <Link href={`/s/${spaceId}/${shiftYm(ym, -1)}`} aria-label="Previous month" className={navBtn}>
           <MdChevronLeft className="h-5 w-5" />
         </Link>
