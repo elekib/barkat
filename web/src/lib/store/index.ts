@@ -1036,3 +1036,13 @@ export function overrideBalance(db: Db, monthId: number, bankId: number, target:
   if (gap !== 0) db.prepare("UPDATE banks SET adjust = adjust + ? WHERE id = ?").run(gap, bankId);
   return gap;
 }
+
+/**
+ * Admin override, in the bank's own terms: set an account to `target`, the figure the bank shows, which still
+ * counts payments marked Payment Made (they have been sent but have not left yet). The account's balance
+ * here is net of those, so they come off before the difference is kept. The cushion then takes them off once.
+ */
+export function overrideBankFigure(db: Db, monthId: number, bankId: number, target: Cents): Cents {
+  const bank = loadMonth(db, monthId).banks.find((b) => b.id === bankId);
+  return bank ? overrideBalance(db, monthId, bankId, target - bank.made) : 0;
+}

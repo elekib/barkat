@@ -171,8 +171,6 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
     banks: rows.banks.map((b) => b.balance + b.made),
   });
   const ctx: Ctx = { spaceId, ym };
-  // Payment Made has already left the account, so it is no longer part of what is still to pay.
-  const madeOf = (items: { status: string; projected: number }[]) => items.filter((i) => i.status === "Payment Made").reduce((a, i) => a + i.projected, 0);
   const schedules = listSchedules(db, spaceId);
 
   const metrics = monthMetrics({
@@ -247,10 +245,10 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
           </p>
         </div>
         <dl className="grid w-full grid-cols-2 gap-x-8 gap-y-3 sm:w-auto">
-          <Eq label="Banks" value={formatMoney(summary.paymentDifference)} />
+          <Eq label="Banks" value={formatMoney(summary.bankTotal)} />
           <Eq label="+ Income to arrive" value={formatMoney(summary.pendingIncome)} />
-          <Eq label="− Bills to pay" value={formatMoney(summary.outstandingBills - madeOf(rows.bills))} />
-          <Eq label="− One-offs to pay" value={formatMoney(summary.outstandingAdHoc - madeOf(rows.adHoc))} />
+          <Eq label="− Bills to pay" value={formatMoney(summary.outstandingBills)} />
+          <Eq label="− One-offs to pay" value={formatMoney(summary.outstandingAdHoc)} />
         </dl>
       </section>
       <DueCard due={due} />
@@ -281,7 +279,7 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
           tone={metrics.savingsRate === null ? undefined : metrics.left >= 0 ? "good" : "bad"}
           note={`${metrics.left >= 0 ? "" : "-"}${formatMoney(Math.abs(metrics.left))} left of ${formatMoney(metrics.incomeTotal)} income`}
         />
-        <Tile icon={MdNorthEast} label="Sent, not cleared" value={formatMoney(summary.paymentMade)} note={`Already out of the bank: ${formatMoney(summary.paymentDifference)} left`} />
+        <Tile icon={MdNorthEast} label="Sent, not cleared" value={formatMoney(summary.paymentMade)} note={`Bank shows ${formatMoney(summary.bankTotal)}; ${formatMoney(summary.paymentDifference)} once they clear`} />
       </section>
 
       {/* charts */}
@@ -330,7 +328,7 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
           chip={<IconChip icon={MdAccountBalanceWallet} />}
           title="Accounts"
           sub="Shared by every month. Each balance moves when income is Received and bills are Paid."
-          summary={`${accounts.length} account${accounts.length === 1 ? "" : "s"} · ${formatMoney(summary.paymentDifference)}`}
+          summary={`${accounts.length} account${accounts.length === 1 ? "" : "s"} · ${formatMoney(summary.bankTotal)}`}
           pad="md"
           className={`${card} mb-6`}
           actions={
@@ -343,7 +341,7 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
                   id: b.id,
                   name: b.name,
                   kind: b.kind,
-                  balance: b.balance,
+                  balance: b.balance + b.made,
                   uses: [...rows.bills, ...rows.adHoc, ...rows.incomes].filter((x) => x.bankId === b.id).length,
                 }))}
               />
@@ -355,11 +353,13 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
             {accounts.length === 0 && <p className="px-2 py-2 text-sm text-muted">No accounts yet. Use Manage accounts to add one.</p>}
             {accounts.map((a) => {
               const opening = rows.banks.find((b) => b.id === a.id)?.opening;
-              const change = opening === undefined || a.id === null ? null : rows.banks.find((b) => b.id === a.id)!.organic - opening;
+              const bank = rows.banks.find((b) => b.id === a.id);
+              // In the bank's own terms, like the Balance beside it: Payment Made counts until it clears.
+              const change = opening === undefined || !bank ? null : bank.organic + bank.made - opening;
               return (
                 <div key={a.id ?? "none"} className={`${ROW} ${gridOf("account", false)} text-sm tabular-nums`}>
                   <span className="truncate px-2 font-medium">{a.name}</span>
-                  <span className="px-2 text-right font-semibold">{formatMoney(rows.banks.find((b) => b.id === a.id)?.balance ?? a.balance)}</span>
+                  <span className="px-2 text-right font-semibold">{formatMoney(a.balance)}</span>
                   <span className={`px-2 text-right ${change === null || change === 0 ? "text-muted" : change > 0 ? "text-good" : "text-bad"}`}>
                     {change === null ? "–" : change === 0 ? formatMoney(0) : `${change > 0 ? "▲ " : "▼ "}${formatMoney(Math.abs(change))}`}
                   </span>

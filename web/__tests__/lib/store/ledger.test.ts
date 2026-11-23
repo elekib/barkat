@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, openDb } from "@/lib/db";
 import { migrations } from "@/lib/db/migrations";
-import { addRow, createMonth, createSpace, deleteRow, loadMonth, overrideBalance, updateRow } from "@/lib/store";
+import { addRow, createMonth, createSpace, deleteRow, loadMonth, overrideBalance, overrideBankFigure, updateRow } from "@/lib/store";
+import { summarize } from "@/lib/budget/summary";
 
 const c = (d: number) => d * 100;
 
@@ -119,5 +120,32 @@ describe("migration to balances that carry", () => {
     expect(loadMonth(db, feb.id).banks[0].balance).toBe(c(700));
     expect(loadMonth(db, jan.id).banks[0]).toMatchObject({ opening: c(800), carried: false });
     expect(db.prepare("SELECT COUNT(*) AS n FROM adhoc").get()).toMatchObject({ n: 0 });
+  });
+});
+
+describe("overriding to the bank's figure", () => {
+  it("sets what the bank shows; payments sent come off for the cushion, not twice", () => {
+    const db = openDb(":memory:");
+    const space = createSpace(db, "Home");
+    const m = createMonth(db, space, "2026-01");
+    const acct = addRow(db, "bank", m, { name: "Checking", balance: c(1000) });
+    addRow(db, "bill", m, { name: "Card", status: "Payment Made", projected: c(250), bankId: acct });
+    addRow(db, "bill", m, { name: "Gym", status: "Pending", projected: c(50), bankId: acct });
+
+    // The bank still shows 2,000 (the 250 has not cleared). Balance here is net of it.
+    overrideBankFigure(db, m, acct, c(2000));
+    const [bank] = loadMonth(db, m).banks;
+    expect(bank.balance + bank.made).toBe(c(2000));
+    expect(bank.balance).toBe(c(1750));
+
+    // Cushion: bank 2,000, less what is still to leave (sent 250 + pending 50).
+    const s = summarize({ bills: loadMonth(db, m).bills, adHoc: [], incomes: [], banks: [bank.balance + bank.made] });
+    expect(s.cushion).toBe(c(1700));
+
+    // Once the card payment clears (Paid), the bank figure is unchanged and the cushion does not move.
+    updateRow(db, "bill", loadMonth(db, m).bills[0].id, { status: "Paid" });
+    const after = loadMonth(db, m).banks[0];
+    expect(after.balance).toBe(c(1750));
+    expect(summarize({ bills: loadMonth(db, m).bills, adHoc: [], incomes: [], banks: [after.balance + after.made] }).cushion).toBe(c(1700));
   });
 });
