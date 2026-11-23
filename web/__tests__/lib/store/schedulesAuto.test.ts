@@ -8,6 +8,7 @@ import {
   createMonth,
   createSpace,
   deleteSchedule,
+  rebuildSchedulePaydays,
   loadMonth,
   syncSchedules,
   updateSchedule,
@@ -157,5 +158,39 @@ describe("a schedule changed after paychecks were removed by hand", () => {
     updateSchedule(db, id, { amount: c(600) });
     syncSchedules(db, space, "2026-06");
     expect(loadMonth(db, month).incomes.map((i) => [i.label, i.amount])).toEqual([["Salary", c(600)]]);
+  });
+});
+
+describe("rebuilding the schedule paychecks", () => {
+  it("replaces messed-up paychecks, brings back removed paydays, and keeps Received and hand-entered income", () => {
+    const { db, space, month } = setup();
+    addSchedule(db, space, { label: "Pay", amount: c(500), frequency: "weekly", anchor: "2026-06-05" });
+    applySchedules(db, space, month, "2026-06");
+    const rows = loadMonth(db, month).incomes;
+    db.prepare("UPDATE incomes SET status = 'Received' WHERE id = ?").run(rows[0].id); // 06-05 arrived
+    db.prepare("UPDATE incomes SET amount = ? WHERE id = ?").run(c(1), rows[1].id); // 06-12 got mangled
+    bulkRows(db, space, "income", [rows[2].id], { type: "delete" }); // 06-19 removed by hand
+    addRow(db, "income", month, { label: "Bonus", date: "2026-06-15", amount: c(50), status: "Pending" });
+
+    rebuildSchedulePaydays(db, space, "2026-06");
+    expect(loadMonth(db, month).incomes.map((i) => [i.label, i.date, i.amount, i.status])).toEqual([
+      ["Pay", "2026-06-05", c(500), "Received"],
+      ["Pay", "2026-06-12", c(500), "Pending"],
+      ["Bonus", "2026-06-15", c(50), "Pending"],
+      ["Pay", "2026-06-19", c(500), "Pending"],
+      ["Pay", "2026-06-26", c(500), "Pending"],
+    ]);
+  });
+
+  it("leaves months before the viewed one alone", () => {
+    const { db, space, month } = setup();
+    addSchedule(db, space, { label: "Pay", amount: c(500), frequency: "monthly", anchor: "2026-06-05" });
+    applySchedules(db, space, month, "2026-06");
+    const july = createMonth(db, space, "2026-07");
+    applySchedules(db, space, july, "2026-07");
+    db.prepare("UPDATE incomes SET amount = ?").run(c(1));
+    rebuildSchedulePaydays(db, space, "2026-07");
+    expect(loadMonth(db, month).incomes[0].amount).toBe(c(1));
+    expect(loadMonth(db, july).incomes[0].amount).toBe(c(500));
   });
 });

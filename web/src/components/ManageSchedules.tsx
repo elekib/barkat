@@ -1,8 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { MdAdd, MdClose, MdDeleteOutline, MdEventRepeat } from "react-icons/md";
-import { bulkAction, saveSchedulesAction } from "@/app/actions/data";
+import { MdAdd, MdClose, MdDeleteOutline, MdEventRepeat, MdRestartAlt } from "react-icons/md";
+import { bulkAction, rebuildSchedulesAction, saveSchedulesAction } from "@/app/actions/data";
 import { editableMoney, formatMoney, parseMoney } from "@/lib/budget/money";
 import { FREQUENCIES, FREQUENCY_LABEL, scheduleDates, type Frequency } from "@/lib/budget/schedules";
 import { btn, btnGhost, focus, input } from "./ui";
@@ -96,6 +96,8 @@ function Fields({ prefix, ym, accounts, start }: { prefix: "" | "new"; ym: strin
  * The repeating paychecks of a book, in one dialog on the Income card. Edit the rows, use Add schedule for a
  * new one, then Save once: the Income card is brought into step with them (paydays added, moved or taken
  * back). Each row says what it will give this month as you type. Removing asks first and applies at once.
+ * Rebuild paychecks is the clean-up for when the Income card has got out of step: it asks first, then replaces the
+ * schedule paychecks from the viewed month on.
  */
 export function ManageSchedules({ spaceId, ym, monthName, schedules, accounts }: { spaceId: number; ym: string; monthName: string; schedules: ManagedSchedule[]; accounts: string[] }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -104,6 +106,19 @@ export function ManageSchedules({ spaceId, ym, monthName, schedules, accounts }:
   const [saved, setSaved] = useState(0);
   const [fresh, setFresh] = useState<number[]>([]);
   const [pending, start] = useTransition();
+  const [rebuilding, setRebuilding] = useState(false);
+
+  // The clean-up runs on its own too; the dialog closes once the Income card has been rebuilt.
+  const rebuild = () => {
+    const data = new FormData();
+    data.set("spaceId", String(spaceId));
+    data.set("ym", ym);
+    start(async () => {
+      await rebuildSchedulesAction(data);
+      setRebuilding(false);
+      dialog.current?.close();
+    });
+  };
 
   // Removing runs on its own, outside the form, so the dialog stays open and unsaved edits are kept.
   const remove = (id: number) => {
@@ -130,7 +145,10 @@ export function ManageSchedules({ spaceId, ym, monthName, schedules, accounts }:
         ref={dialog}
         aria-labelledby="schedules-title"
         onClick={(e) => e.target === dialog.current && dialog.current?.close()}
-        onClose={() => setRemoving(null)}
+        onClose={() => {
+          setRemoving(null);
+          setRebuilding(false);
+        }}
         className="glass isolate m-auto w-[min(46rem,calc(100vw-2rem))] rounded-2xl border border-line bg-surface p-0 text-ink shadow-card backdrop:bg-black/50"
       >
         <form
@@ -211,7 +229,33 @@ export function ManageSchedules({ spaceId, ym, monthName, schedules, accounts }:
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
+          {rebuilding && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3 text-sm">
+              <p className="min-w-[14rem] flex-1">
+                Rebuild the paychecks from {monthName} on? Every Pending paycheck the schedules added is replaced by a fresh one from the schedules as they are now, and paydays you removed by hand come back.
+                Received paychecks and income you added yourself stay. Save any edits above first.
+              </p>
+              <button type="button" onClick={() => setRebuilding(false)} className={btnGhost}>
+                Keep as is
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={rebuild}
+                className={`inline-flex items-center rounded-lg bg-bad px-3 py-2 font-semibold text-page transition hover:brightness-105 disabled:opacity-60 ${focus}`}
+              >
+                Rebuild paychecks
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3">
+            {schedules.length > 0 && !rebuilding && (
+              <button type="button" onClick={() => setRebuilding(true)} className={`${btnGhost} mr-auto gap-1`} title="Clean-up for when the paychecks look wrong">
+                <MdRestartAlt className="h-4 w-4" aria-hidden />
+                Rebuild paychecks
+              </button>
+            )}
             <button type="button" onClick={() => dialog.current?.close()} className={btnGhost}>
               Cancel
             </button>

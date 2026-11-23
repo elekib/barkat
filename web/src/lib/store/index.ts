@@ -742,6 +742,19 @@ export function applySchedules(db: Db, spaceId: number, monthId: number, ym: str
   return added;
 }
 
+/**
+ * Clean-up for when the paychecks have got out of step: from `fromYm` on, take back every Pending paycheck the
+ * schedules added, forget the paydays removed by hand, then fill them in again from the schedules as they are.
+ * Paychecks marked Received and income entered by hand (not from a schedule) stay. Returns how many were added.
+ */
+export function rebuildSchedulePaydays(db: Db, spaceId: number, fromYm: string): number {
+  const months = db.prepare("SELECT id, ym FROM months WHERE space_id = ? AND ym >= ? ORDER BY ym").all(spaceId, fromYm) as { id: number; ym: string }[];
+  const drop = db.prepare("DELETE FROM incomes WHERE month_id = ? AND schedule_id IS NOT NULL AND status = 'Pending'");
+  for (const m of months) drop.run(m.id);
+  db.prepare("DELETE FROM schedule_skips WHERE date >= ? AND schedule_id IN (SELECT id FROM income_schedules WHERE space_id = ?)").run(`${fromYm}-01`, spaceId);
+  return months.reduce((n, m) => n + applySchedules(db, spaceId, m.id, m.ym, { refresh: true }), 0);
+}
+
 /** After a schedule changes: bring the month being viewed and every later month into step with it. */
 export function syncSchedules(db: Db, spaceId: number, fromYm: string): void {
   const months = db.prepare("SELECT id, ym FROM months WHERE space_id = ? AND ym >= ? ORDER BY ym").all(spaceId, fromYm) as { id: number; ym: string }[];

@@ -19,6 +19,7 @@ import {
   bulkRows,
   bulkSchedules,
   type BulkOp,
+  rebuildSchedulePaydays,
   syncSchedules,
   scheduleSpace,
   updateSchedule,
@@ -342,6 +343,15 @@ export async function saveSchedulesAction(form: FormData): Promise<void> {
     });
   });
   syncSchedules(db, ctx.spaceId, ctx.ym);
+  refresh(ctx.spaceId, ctx.ym);
+}
+
+/** The Schedules dialog's clean-up: rebuild the schedule paychecks from the viewed month on. */
+export async function rebuildSchedulesAction(form: FormData): Promise<void> {
+  if (!(await adminOrNull())) return;
+  const ctx = context(form);
+  if (!ctx) return;
+  rebuildSchedulePaydays(getDb(), ctx.spaceId, ctx.ym);
   refresh(ctx.spaceId, ctx.ym);
 }
 
