@@ -638,7 +638,15 @@ export function addSchedule(db: Db, spaceId: number, values: Partial<Omit<Schedu
   return Number(res.lastInsertRowid);
 }
 
+/**
+ * Change a schedule. Changing when it pays or how much (its repeat, a payday or its amount) starts it afresh: the
+ * paydays that were removed by hand are forgotten, so the new settings fill in again. A new name or account does not.
+ */
 export function updateSchedule(db: Db, id: number, values: RowValues): void {
+  const before = db.prepare("SELECT frequency, anchor, amount FROM income_schedules WHERE id = ?").get(id) as { frequency: string; anchor: string; amount: number } | undefined;
+  if (before && (["frequency", "anchor", "amount"] as const).some((k) => k in values && values[k] !== before[k])) {
+    db.prepare("DELETE FROM schedule_skips WHERE schedule_id = ?").run(id);
+  }
   const entries = Object.entries(values).flatMap(([k, v]) => (k in SCHEDULE_COLUMNS ? [[SCHEDULE_COLUMNS[k], v] as const] : []));
   if (entries.length === 0) return;
   db.prepare(`UPDATE income_schedules SET ${entries.map(([c]) => `${c} = ?`).join(", ")} WHERE id = ?`).run(
@@ -679,13 +687,19 @@ export function scheduleSpace(db: Db, id: number): number | undefined {
  *    (linked, not duplicated).
  *  - A payday the user deleted stays deleted.
  *  - Anything else gets a new Pending row.
- * With `refresh` (a schedule was just changed) the still-Pending rows of a schedule also follow its new amount and
+ * With `refresh` (a schedule was just changed) the still-Pending rows of a schedule also follow its new name, amount and
  * account, and Pending rows left on dates the schedule no longer has are removed, so no stale payday keeps
  * counting toward what carries forward. Returns how many rows were added.
  */
 export function applySchedules(db: Db, spaceId: number, monthId: number, ym: string, options: { refresh?: boolean } = {}): number {
-  // A schedule with no amount yet (just added, still being filled in) adds nothing.
-  const schedules = listSchedules(db, spaceId).filter((s) => s.amount > 0);
+  const all = listSchedules(db, spaceId);
+  // A schedule with no amount (just added, still being filled in, or set to nothing) adds nothing. When one is
+  // changed to no amount, it takes back its Pending paydays, as deleting it would.
+  if (options.refresh) {
+    const dropPending = db.prepare("DELETE FROM incomes WHERE month_id = ? AND schedule_id = ? AND status = 'Pending'");
+    for (const s of all) if (s.amount <= 0) dropPending.run(monthId, s.id);
+  }
+  const schedules = all.filter((s) => s.amount > 0);
   if (schedules.length === 0) return 0;
   const banks = loadMonth(db, monthId).banks;
   const bankByName = (name: string) => (name ? (banks.find((b) => b.name.trim().toLowerCase() === name.trim().toLowerCase())?.id ?? null) : null);
@@ -694,7 +708,7 @@ export function applySchedules(db: Db, spaceId: number, monthId: number, ym: str
   const handRows = db.prepare("SELECT id, label, amount FROM incomes WHERE month_id = ? AND schedule_id IS NULL AND date = ? ORDER BY id");
   const skipped = db.prepare("SELECT 1 FROM schedule_skips WHERE schedule_id = ? AND date = ?");
   const link = db.prepare("UPDATE incomes SET schedule_id = ? WHERE id = ?");
-  const follow = db.prepare("UPDATE incomes SET amount = ?, bank_id = ? WHERE id = ?");
+  const follow = db.prepare("UPDATE incomes SET label = COALESCE(NULLIF(?, ''), label), amount = ?, bank_id = ? WHERE id = ?");
   const add = db.prepare("INSERT INTO incomes (month_id, label, date, amount, status, schedule_id, bank_id) VALUES (?, ?, ?, ?, 'Pending', ?, ?)");
   const pendingOwn = db.prepare("SELECT id, date FROM incomes WHERE month_id = ? AND schedule_id = ? AND status = 'Pending'");
   const drop = db.prepare("DELETE FROM incomes WHERE id = ?");
@@ -706,7 +720,7 @@ export function applySchedules(db: Db, spaceId: number, monthId: number, ym: str
     for (const date of dates) {
       const own = ownRow.get(monthId, sch.id, date) as { id: number; status: string } | undefined;
       if (own) {
-        if (options.refresh && own.status === "Pending") follow.run(sch.amount, bankId, own.id);
+        if (options.refresh && own.status === "Pending") follow.run(sch.label, sch.amount, bankId, own.id);
         continue;
       }
       const hand = (handRows.all(monthId, date) as { id: number; label: string; amount: number }[]).find(
@@ -726,6 +740,19 @@ export function applySchedules(db: Db, spaceId: number, monthId: number, ym: str
     }
   }
   return added;
+}
+
+/**
+ * Clean-up for when the paychecks have got out of step: from `fromYm` on, take back every Pending paycheck the
+ * schedules added, forget the paydays removed by hand, then fill them in again from the schedules as they are.
+ * Paychecks marked Received and income entered by hand (not from a schedule) stay. Returns how many were added.
+ */
+export function rebuildSchedulePaydays(db: Db, spaceId: number, fromYm: string): number {
+  const months = db.prepare("SELECT id, ym FROM months WHERE space_id = ? AND ym >= ? ORDER BY ym").all(spaceId, fromYm) as { id: number; ym: string }[];
+  const drop = db.prepare("DELETE FROM incomes WHERE month_id = ? AND schedule_id IS NOT NULL AND status = 'Pending'");
+  for (const m of months) drop.run(m.id);
+  db.prepare("DELETE FROM schedule_skips WHERE date >= ? AND schedule_id IN (SELECT id FROM income_schedules WHERE space_id = ?)").run(`${fromYm}-01`, spaceId);
+  return months.reduce((n, m) => n + applySchedules(db, spaceId, m.id, m.ym, { refresh: true }), 0);
 }
 
 /** After a schedule changes: bring the month being viewed and every later month into step with it. */

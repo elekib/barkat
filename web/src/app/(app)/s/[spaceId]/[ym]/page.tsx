@@ -1,14 +1,12 @@
-import { MdAccountBalance, MdAccountBalanceWallet, MdAdd, MdBarChart, MdBolt, MdDonutLarge, MdEventRepeat, MdLabel, MdMoveToInbox, MdPayments, MdReceiptLong, MdSavings, MdShowChart, MdTaskAlt, MdCheckCircle, MdEvent, MdEventAvailable, MdWarningAmber, MdSwapVert, MdChevronLeft, MdChevronRight, MdClose, MdNorthEast, MdSchedule, MdInsights, MdTrendingDown, MdTrendingUp } from "react-icons/md";
+import { MdAccountBalance, MdAccountBalanceWallet, MdAdd, MdBarChart, MdBolt, MdDonutLarge, MdLabel, MdMoveToInbox, MdPayments, MdReceiptLong, MdSavings, MdShowChart, MdTaskAlt, MdCheckCircle, MdEvent, MdEventAvailable, MdWarningAmber, MdSwapVert, MdChevronLeft, MdChevronRight, MdClose, MdNorthEast, MdSchedule, MdInsights, MdTrendingDown, MdTrendingUp } from "react-icons/md";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import type { IconType } from "react-icons";
 import {
   addRowAction,
-  addScheduleAction,
   createMonthAction,
   saveRowAction,
-  saveScheduleAction,
 } from "@/app/actions/data";
 import { BulkBar } from "@/components/BulkBar";
 import { Collapsible } from "@/components/Collapsible";
@@ -16,6 +14,7 @@ import { IconChip } from "@/components/IconChip";
 import { ClearMonth } from "@/components/ClearMonth";
 import { CopyFromMonth } from "@/components/CopyFromMonth";
 import { ManageAccounts } from "@/components/ManageAccounts";
+import { ManageSchedules } from "@/components/ManageSchedules";
 import { MonthPicker } from "@/components/MonthPicker";
 import { AutoForm } from "@/components/AutoForm";
 import { Meter, RankedBars, SegmentedBar, Tile } from "@/components/charts/Charts";
@@ -27,7 +26,6 @@ import { dueStatus, monthMetrics, type DueStatus } from "@/lib/budget/metrics";
 import { editableMoney, formatCompact, formatMoney } from "@/lib/budget/money";
 import { currentYm, dateInMonth, isYm, monthEnd, monthLabel, monthStart, shiftYm } from "@/lib/budget/months";
 import { summarize } from "@/lib/budget/summary";
-import { FREQUENCIES, FREQUENCY_LABEL } from "@/lib/budget/schedules";
 import { trend } from "@/lib/budget/trend";
 import { BILL_STATUSES, INCOME_STATUSES } from "@/lib/budget/types";
 import { requireUser } from "@/lib/auth/session";
@@ -46,13 +44,12 @@ type Kind = "bank" | "bill" | "income" | "adhoc";
  * Column widths per table, written out in full so Tailwind can see each class. Editors get a narrow
  * first column for the row's select box; viewers do not.
  */
-type GridKey = Kind | "schedule" | "account";
+type GridKey = Kind | "account";
 const GRIDS: Record<GridKey, { edit: string; view: string }> = {
   bank: { edit: "grid-cols-[2.5rem_1.4fr_1fr_1fr] min-w-[40rem]", view: "grid-cols-[1.4fr_1fr_1fr] min-w-[40rem]" },
   bill: { edit: "grid-cols-[2.5rem_1.5fr_9.5rem_11rem_6.5rem_6.5rem_6rem_6rem_9rem_9rem_1fr_1.4fr] min-w-[94rem]", view: "grid-cols-[1.5fr_9.5rem_11rem_6.5rem_6.5rem_6rem_6rem_9rem_9rem_1fr_1.4fr] min-w-[94rem]" },
   adhoc: { edit: "grid-cols-[2.5rem_1.5fr_9.5rem_11rem_6.5rem_1fr_1fr_1.5fr] min-w-[62rem]", view: "grid-cols-[1.5fr_9.5rem_11rem_6.5rem_1fr_1fr_1.5fr] min-w-[62rem]" },
   income: { edit: "grid-cols-[2.5rem_1.5fr_9rem_7rem_9rem_9.5rem] min-w-[48rem]", view: "grid-cols-[1.5fr_9rem_7rem_9rem_9.5rem] min-w-[48rem]" },
-  schedule: { edit: "grid-cols-[2.5rem_1.5fr_10rem_9rem_7rem_9rem] min-w-[48rem]", view: "grid-cols-[1.5fr_10rem_9rem_7rem_9rem] min-w-[48rem]" },
   account: { edit: "grid-cols-[2.5rem_1.5fr_1fr_1fr_1fr_1fr_1fr_1fr] min-w-[46rem]", view: "grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1fr_1fr] min-w-[46rem]" },
 };
 const gridOf = (kind: GridKey, canEdit: boolean) => GRIDS[kind][canEdit ? "edit" : "view"];
@@ -451,73 +448,7 @@ export default async function MonthPage({ params }: { params: Promise<Params> })
         {canEdit && <BulkBar formId="bulk-adhoc" rowKind="adhoc" spaceId={spaceId} ym={ym} noun={["one-off payment", "one-off payments"]} statuses={BILL_STATUSES} accounts={rows.banks.map((b) => ({ value: String(b.id), label: b.name || "Untitled account" }))} />}
       </Sheet>
 
-      <Collapsible
-        id="income-schedules"
-        chip={<IconChip icon={MdEventRepeat} size="sm" />}
-        title="Income schedules"
-        sub="Paydays are added to the Income card on their own, with no duplicates. Use Add income for one-off pay."
-        summary={`${schedules.length} schedule${schedules.length === 1 ? "" : "s"}`}
-        className={`${card} mb-3`}
-        actions={
-          canEdit ? (
-            <>
-              <form action={addScheduleAction}>
-                <input type="hidden" name="spaceId" value={spaceId} />
-                <input type="hidden" name="ym" value={ym} />
-                <button type="submit" className={`${btnGhost} gap-1`}>
-                  <MdAdd className="h-4 w-4" aria-hidden />
-                  Add schedule
-                </button>
-              </form>
-            </>
-          ) : undefined
-        }
-      >
-        <div className="-m-1 overflow-x-auto p-1">
-          {schedules.length === 0 ? (
-            <p className="py-2 text-sm text-muted">No schedules yet. Add one for a paycheck that repeats weekly, every two weeks or monthly.</p>
-          ) : (
-            <>
-              <Head grid={gridOf("schedule", canEdit)} labels={["What", "Repeats", "A payday", "Amount", "Into"]} align="lllrl" bulk={canEdit ? { formId: "bulk-schedule", noun: "schedules" } : undefined} />
-              {schedules.map((sch) => (
-                <AutoForm
-                  key={`${sch.id}-${sch.label}-${sch.amount}-${sch.frequency}-${sch.anchor}-${sch.account}`}
-                  action={saveScheduleAction}
-                  className={`${ROW} ${gridOf("schedule", canEdit)}`}
-                >
-                  <input type="hidden" name="id" value={sch.id} />
-                  <input type="hidden" name="spaceId" value={spaceId} />
-                  <input type="hidden" name="ym" value={ym} />
-                  {canEdit && <input type="checkbox" form="bulk-schedule" name="id" value={sch.id} aria-label={`Select ${sch.label || "schedule"}`} className={PICK} />}
-                  <fieldset disabled={!canEdit} className="contents">
-                    <input name="label" defaultValue={sch.label} placeholder="Paycheck" aria-label="Schedule label" className={cell} />
-                    <select name="frequency" defaultValue={sch.frequency} aria-label="Repeats" className={`${cell} select-arrow bg-surface`}>
-                      {FREQUENCIES.map((f) => (
-                        <option key={f} value={f}>
-                          {FREQUENCY_LABEL[f]}
-                        </option>
-                      ))}
-                    </select>
-                    <input name="anchor" type="date" defaultValue={sch.anchor} aria-label="A payday" className={cell} />
-                    <input name="amount" defaultValue={editableMoney(sch.amount)} placeholder="0.00" inputMode="decimal" aria-label="Amount" className={`${cell} text-right tabular-nums`} />
-                    <select name="account" defaultValue={sch.account} aria-label="Into account" className={`${cell} select-arrow bg-surface`}>
-                      <option value="">No account</option>
-                      {rows.banks.map((b) => (
-                        <option key={b.id} value={b.name}>
-                          {b.name || "Untitled account"}
-                        </option>
-                      ))}
-                    </select>
-                  </fieldset>
-                </AutoForm>
-              ))}
-              {canEdit && <BulkBar formId="bulk-schedule" rowKind="schedule" spaceId={spaceId} ym={ym} noun={["schedule", "schedules"]} accounts={rows.banks.map((b) => ({ value: b.name, label: b.name || "Untitled account" }))} deleteNote="Paydays it added that are still Pending are removed. Received ones stay." />}
-            </>
-          )}
-        </div>
-      </Collapsible>
-
-      <Sheet id="income" summary={`${rows.incomes.length} · to arrive ${formatMoney(summary.pendingIncome)}`} icon={MdPayments} title="Income" kind="income" ctx={ctx} addLabel="Add income" canEdit={canEdit} footer={<Total label="Still to arrive" value={formatMoney(summary.pendingIncome)} />}>
+      <Sheet id="income" summary={`${rows.incomes.length} · to arrive ${formatMoney(summary.pendingIncome)}`} icon={MdPayments} title="Income" hint="Paychecks from your schedules are added here on their own. Use Schedules to change them, and Add income for one-off pay." kind="income" ctx={ctx} addLabel="Add income" canEdit={canEdit} extraActions={<ManageSchedules spaceId={spaceId} ym={ym} monthName={monthLabel(ym)} schedules={schedules.map((sc) => ({ id: sc.id, label: sc.label, amount: sc.amount, frequency: sc.frequency, anchor: sc.anchor, account: sc.account }))} accounts={rows.banks.map((b) => b.name)} />} footer={<Total label="Still to arrive" value={formatMoney(summary.pendingIncome)} />}>
         <Head grid={gridOf("income", canEdit)} labels={["What", "Date", "Amount", "Into", "Status"]} align="llrll" bulk={canEdit ? { formId: "bulk-income", noun: "income entries" } : undefined} />
         {rows.incomes.map((i) => (
           <Row key={`${i.id}-${i.bankId}-${i.label}-${i.date}-${i.amount}-${i.status}`} kind="income" id={i.id} ctx={ctx} canEdit={canEdit} label={i.label || i.date}>
@@ -645,6 +576,7 @@ function Sheet({
   hint,
   summary,
   canEdit,
+  extraActions,
   footer,
   children,
 }: {
@@ -657,6 +589,8 @@ function Sheet({
   hint?: string;
   summary?: string;
   canEdit: boolean;
+  /** Buttons beside the add button, for editors. */
+  extraActions?: ReactNode;
   /** Totals under the table. Outside the scrolling area, so they stay put when the table scrolls sideways. */
   footer?: ReactNode;
   children: ReactNode;
@@ -671,15 +605,18 @@ function Sheet({
       className={`${card} mb-3`}
       actions={
         canEdit ? (
-          <form action={addRowAction}>
-            <input type="hidden" name="rowKind" value={kind} />
-            <input type="hidden" name="spaceId" value={ctx.spaceId} />
-            <input type="hidden" name="ym" value={ctx.ym} />
-            <button type="submit" className={`${btnGhost} gap-1`}>
-              <MdAdd className="h-4 w-4" aria-hidden />
-              {addLabel}
-            </button>
-          </form>
+          <>
+            {extraActions}
+            <form action={addRowAction}>
+              <input type="hidden" name="rowKind" value={kind} />
+              <input type="hidden" name="spaceId" value={ctx.spaceId} />
+              <input type="hidden" name="ym" value={ctx.ym} />
+              <button type="submit" className={`${btnGhost} gap-1`}>
+                <MdAdd className="h-4 w-4" aria-hidden />
+                {addLabel}
+              </button>
+            </form>
+          </>
         ) : undefined
       }
     >

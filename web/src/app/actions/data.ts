@@ -19,6 +19,7 @@ import {
   bulkRows,
   bulkSchedules,
   type BulkOp,
+  rebuildSchedulePaydays,
   syncSchedules,
   scheduleSpace,
   updateSchedule,
@@ -302,39 +303,55 @@ const SCHEDULE_FIELDS: Record<string, z.ZodType<string | number | null>> = {
   account: text(80),
 };
 
-function parseSchedule(form: FormData): RowValues | null {
-  const values: RowValues = {};
-  for (const [field, schema] of Object.entries(SCHEDULE_FIELDS)) {
-    const raw = form.get(field);
-    if (typeof raw !== "string") continue;
-    const parsed = schema.safeParse(raw);
-    if (!parsed.success) return null;
-    values[field] = parsed.data;
-  }
-  return values;
-}
-
-export async function addScheduleAction(form: FormData): Promise<void> {
+/**
+ * Save everything in the Schedules dialog at once: each listed schedule's fields, and any new schedules added
+ * with "Add schedule". Then the viewed month and every later one are brought into step, so the Income card
+ * changes with the schedules. A new schedule needs an amount; a row left without one is ignored.
+ */
+export async function saveSchedulesAction(form: FormData): Promise<void> {
   if (!(await adminOrNull())) return;
   const ctx = context(form);
   if (!ctx) return;
-  // The first payday defaults to the first of the viewed month; the user then sets the real one.
-  addSchedule(getDb(), ctx.spaceId, { anchor: `${ctx.ym}-01` });
+  const db = getDb();
+  const field = (prefix: string, i: number): RowValues | null => {
+    const values: RowValues = {};
+    for (const [name, schema] of Object.entries(SCHEDULE_FIELDS)) {
+      const raw = form.getAll(prefix ? `${prefix}${name[0].toUpperCase()}${name.slice(1)}` : name)[i];
+      if (typeof raw !== "string") return null;
+      const parsed = schema.safeParse(raw);
+      if (!parsed.success) return null;
+      values[name] = parsed.data;
+    }
+    return values;
+  };
+
+  form.getAll("rowId").forEach((raw, i) => {
+    const id = Number(raw);
+    if (!Number.isInteger(id) || scheduleSpace(db, id) !== ctx.spaceId) return;
+    const values = field("", i);
+    if (values) updateSchedule(db, id, values);
+  });
+  form.getAll("newAmount").forEach((_, i) => {
+    const values = field("new", i);
+    if (!values || typeof values.amount !== "number" || values.amount <= 0) return;
+    addSchedule(db, ctx.spaceId, {
+      label: String(values.label),
+      amount: values.amount,
+      frequency: values.frequency as (typeof FREQUENCIES)[number],
+      anchor: String(values.anchor),
+      account: String(values.account),
+    });
+  });
+  syncSchedules(db, ctx.spaceId, ctx.ym);
   refresh(ctx.spaceId, ctx.ym);
 }
 
-export async function saveScheduleAction(form: FormData): Promise<void> {
+/** The Schedules dialog's clean-up: rebuild the schedule paychecks from the viewed month on. */
+export async function rebuildSchedulesAction(form: FormData): Promise<void> {
   if (!(await adminOrNull())) return;
   const ctx = context(form);
-  const id = Number(form.get("id"));
-  if (!ctx || !Number.isInteger(id)) return;
-  const db = getDb();
-  if (scheduleSpace(db, id) !== ctx.spaceId) return;
-  const values = parseSchedule(form);
-  if (values) {
-    updateSchedule(db, id, values);
-    syncSchedules(db, ctx.spaceId, ctx.ym);
-  }
+  if (!ctx) return;
+  rebuildSchedulePaydays(getDb(), ctx.spaceId, ctx.ym);
   refresh(ctx.spaceId, ctx.ym);
 }
 
