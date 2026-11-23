@@ -75,9 +75,9 @@ export default async function Home() {
       name: s.name,
       started: true,
       accounts: rows.banks.length,
-      bankTotal: sum.paymentDifference,
+      bankTotal: sum.bankTotal,
       cushion: sum.cushion,
-      toPay: sum.outstandingBills + sum.outstandingAdHoc - sum.paymentMade,
+      toPay: sum.outstandingBills + sum.outstandingAdHoc,
       incomeToArrive: sum.pendingIncome,
       paidShare: total > 0 ? paid / total : null,
       due: dueStatus(rows.bills, now.getDate()),
@@ -127,7 +127,7 @@ export default async function Home() {
         <section aria-label="All books" className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(13rem,1fr))]">
           <Tile icon={MdSavings} label="Total cushion" value={formatMoney(all.cushion)} tone={all.cushion > 0 ? "good" : "bad"} note="Across every started book" />
           <Tile icon={MdAccountBalance} label="In the bank" value={formatMoney(all.bankTotal)} note={`${all.started} book${all.started === 1 ? "" : "s"} this month`} />
-          <Tile icon={MdNorthEast} label="Still to pay" value={formatMoney(all.toPay)} note="Bills and one-offs" />
+          <Tile icon={MdNorthEast} label="Still to pay" value={formatMoney(all.toPay)} note="Bills and one-offs, incl. payments sent" />
           <Tile icon={MdSouthWest} label="Income to arrive" value={formatMoney(all.incomeToArrive)} note="Pending this month" />
         </section>
       )}

@@ -78,7 +78,7 @@ export function ManageAccounts({ spaceId, ym, monthName, accounts }: { spaceId: 
               </h2>
               <p className="mt-0.5 text-sm text-muted">
                 Accounts are shared by every month, from {monthName} on. Balances also move when you mark income Received or bills Paid. Changing a balance here is an admin override: it
-                sets the balance as typed, with no income or bill entry, and later months carry on from it.
+                sets the balance as typed, with no income or bill entry, and later months carry on from it. Type the figure your bank shows: bills marked Payment Made are still in it, and the cushion takes them off.
               </p>
             </div>
             <button type="button" onClick={() => dialog.current?.close()} aria-label="Close" className={`rounded-md p-1 text-muted hover:text-ink ${focus}`}>
