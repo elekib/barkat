@@ -14,7 +14,7 @@ import { parseBackup, restoreBook } from "@/lib/backup";
 import { getDb } from "@/lib/db";
 import {
   addRow,
-  overrideBalance,
+  overrideBankFigure,
   addSchedule,
   bulkRows,
   bulkSchedules,
@@ -248,7 +248,7 @@ export async function saveRowAction(form: FormData): Promise<void> {
 
 /**
  * Save everything in the Manage accounts dialog at once: each listed account's name, type and balance
- * (a new balance is an admin override: it is set as given, without an entry, and later entries and
+ * (the bank's figure; a new balance is an admin override: it is set as given, without an entry, and later entries and
  * months carry on from it), and any new accounts added with "Add account" (a new row with no name is ignored).
  */
 export async function saveAccountsAction(form: FormData): Promise<void> {
@@ -274,7 +274,7 @@ export async function saveAccountsAction(form: FormData): Promise<void> {
     // showed when it was opened, which may be out of date (a paycheck deleted since), and must not be pinned.
     const untouched = typeof shown[i] === "string" && shown[i] === balances[i];
     const balance = typeof balances[i] === "string" && !untouched ? money.safeParse(balances[i]) : null;
-    if (balance?.success) overrideBalance(db, monthId, id, balance.data as number);
+    if (balance?.success) overrideBankFigure(db, monthId, id, balance.data as number);
   });
 
   const newNames = form.getAll("newName");
@@ -287,7 +287,7 @@ export async function saveAccountsAction(form: FormData): Promise<void> {
     const balance = money.safeParse(String(newBalances[i] ?? ""));
     // The starting balance is an override too (not part of the opening), so it stays out of trends.
     const id = addRow(db, "bank", monthId, { name: name.data, kind: kind.success ? kind.data : "", balance: 0 });
-    if (balance.success) overrideBalance(db, monthId, id, balance.data as number);
+    if (balance.success) overrideBankFigure(db, monthId, id, balance.data as number);
   });
   refresh(ctx.spaceId, ctx.ym);
 }
