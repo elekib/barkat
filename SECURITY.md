@@ -19,3 +19,6 @@ Only the latest release and the `dev` image receive fixes.
 - Roles: `admin` can change data and manage users; `viewer` is read-only, enforced on the server.
 - Serve it over HTTPS (reverse proxy) when it leaves your own network, and set `BARKAT_BASE_URL` and `BARKAT_COOKIE_SECURE=true`.
 - Set a long random `BARKAT_AUTH_SECRET`; otherwise one is generated and kept in the database under `./data`.
+- Any signed-in user, including a `viewer`, can download a book's Excel export and full backup. Only create viewer accounts for people who may see all the data.
+- Barkat trusts the `Host` header for its sign-in origin check (session cookies are `SameSite=Strict`). Have your reverse proxy pin the host name, and cap request body size there (imports allow up to 40 MB).
+- Serve over HTTPS; Barkat itself speaks plain HTTP.
