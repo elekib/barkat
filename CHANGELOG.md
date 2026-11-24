@@ -4,6 +4,10 @@ Follows [Semantic Versioning](https://semver.org/). Before 1.0.0 a minor bump ma
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-24
+
+First public release.
+
 ### Changed
 - Balances are shown as the bank shows them. The Balance column, the Banks line on the Cushion card, the accounts summary, the Overview "In the bank" tile and the Manage accounts field now include bills marked Payment Made (sent, not yet cleared), and the Cushion card's "Bills to pay" includes them too, so Banks + Income to arrive - Bills to pay - One-offs to pay is the cushion, as in the original sheet. Before, the figures were net of Payment Made, so typing the bank's own balance in Manage accounts counted those payments as already gone and the cushion never dropped for them. The cushion itself is unchanged for the same data. Manage accounts now takes the bank's figure and works out the difference to keep. An override typed earlier as a net figure now reads higher by what is marked Payment Made: enter the bank's figure once to correct it.
 
