@@ -1,0 +1,19 @@
+name: Publish dev images
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  images:
+    needs: ci
+    uses: ./.github/workflows/build-images.yml
+    with:
+      release: false
